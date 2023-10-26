@@ -1,6 +1,6 @@
 [package]
 name = "secp"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 authors = ["conduition <conduition@proton.me>"]
 description = "A flexible and secure secp256k1 elliptic curve math library with constant-time support and superb ergonomics."
