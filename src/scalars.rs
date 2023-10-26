@@ -988,11 +988,11 @@ mod subtle_traits {
                 let a_inner = a
                     .into_option()
                     .map(|scalar| scalar.inner.as_ref().clone())
-                    .unwrap_or(k256::Scalar::Zero);
+                    .unwrap_or(k256::Scalar::ZERO);
                 let b_inner = b
                     .into_option()
                     .map(|scalar| scalar.inner.as_ref().clone())
-                    .unwrap_or(k256::Scalar::Zero);
+                    .unwrap_or(k256::Scalar::ZERO);
 
                 let inner_scalar = k256::Scalar::conditional_select(&a_inner, &b_inner, choice);
 
