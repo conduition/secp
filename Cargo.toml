@@ -2,6 +2,12 @@
 name = "secp"
 version = "0.0.1"
 edition = "2021"
+authors = ["conduition <conduition@proton.me>"]
+description = "A flexible and secure secp256k1 elliptic curve math library with constant-time support and superb ergonomics."
+readme = "README.md"
+license = "Unlicense"
+repository = "https://github.com/conduition/cardseed"
+keywords = ["secp256k1", "elliptic", "curve", "math", "schnorr", "signature", "multisig"]
 
 [dependencies]
 base16ct = { version = "0.2.0", default-features = false }
