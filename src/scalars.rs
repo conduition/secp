@@ -55,18 +55,18 @@ const MAX_U256: [u8; 32] = [0xFF; 32];
 /// of the secp256k1 curve. A `Scalar` can be:
 ///
 /// - added, negated, subtracted, and multiplied with other `Scalar` instances.
-/// - added, negated, subtracted, and multiplied with `MaybeScalar`.
-/// - multiplied with `Point`.
-/// - multiplied with `MaybePoint`.
+/// - added, negated, subtracted, and multiplied with [`MaybeScalar`].
+/// - multiplied with [`Point`].
+/// - multiplied with [`MaybePoint`].
 ///
 /// ...using the normal Rust arithemtic operators `+`, `-` and `*`. Such operations
 /// are commutative, i.e. `a * b = b * a` and `a + b = b + a` in call cases.
 ///
 /// Depending on the types involved in an operation, certain operators will produce
 /// different result types which should be handled depending on your use case. For
-/// instance, adding two `Scalar`s results in a `MaybeScalar`, because the two
+/// instance, adding two `Scalar`s results in a [`MaybeScalar`], because the two
 /// `Scalar`s may be additive inverses of each other and their output would result
-/// in `MaybeScalar::Zero` when taken mod `n`.
+/// in [`MaybeScalar::Zero`] when taken mod `n`.
 #[derive(Copy, Clone)]
 #[cfg_attr(feature = "secp256k1", derive(PartialEq))]
 pub struct Scalar {
@@ -78,12 +78,12 @@ pub struct Scalar {
 }
 
 impl Scalar {
-    /// Returns a valid `MaybeScalar` with a value of 1.
+    /// Returns a valid `Scalar` with a value of 1.
     pub fn one() -> Scalar {
         *SCALAR_ONE
     }
 
-    /// Returns a valid `MaybeScalar` with a value of two.
+    /// Returns a valid `Scalar` with a value of two.
     pub fn two() -> Scalar {
         *SCALAR_TWO
     }
@@ -104,8 +104,8 @@ impl Scalar {
     ///
     /// This is used to reduce malleability of ECDSA signatures, whose `s` values
     /// could be considered valid if they are either `s` or `n - s`. Converting
-    /// the `s` value using `Scalar::to_low` and checking it using
-    /// `Scalar::is_high` upon verification fixes this ambiguity.
+    /// the `s` value using [`Scalar::to_low`] and checking it using
+    /// [`Scalar::is_high`] upon verification fixes this ambiguity.
     ///
     /// Beware that leaking timing information about this bit may expose a bit
     /// of information about the scalar.
@@ -113,12 +113,13 @@ impl Scalar {
         self.ct_gt(&Self::half_order())
     }
 
-    /// If `self.is_high()`, this returns `-self`. Otherwise, returns `self` as-is.
+    /// If [`self.is_high()`][Self::is_high], this returns `-self`. Otherwise, returns
+    /// the scalar unchanged.
     ///
     /// This is used to reduce malleability of ECDSA signatures, whose `s` values
     /// could be considered valid if they are either `s` or `n - s`. Converting
-    /// the `s` value using `Scalar::to_low` and checking it using
-    /// `Scalar::is_high` upon verification fixes this ambiguity.
+    /// the `s` value using [`Scalar::to_low`] and checking it using
+    /// [`Scalar::is_high`] upon verification fixes this ambiguity.
     pub fn to_low(self) -> Scalar {
         let choice = self.ct_gt(&Self::half_order());
         Scalar::conditional_select(&self, &(-self), choice)
@@ -282,8 +283,8 @@ mod nonzero_conversions {
 mod std_traits {
     use super::*;
 
-    /// This code was duplicated from the `secp256k1` crate, because
-    /// `k256::NonZeroScalar` doesn't implement `Debug`.
+    /// This implementation was duplicated from the [`secp256k1`] crate, because
+    /// [`k256::NonZeroScalar`] doesn't implement `Debug`.
     impl std::fmt::Debug for Scalar {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
             use std::hash::Hasher as _;
@@ -305,7 +306,8 @@ mod std_traits {
         }
     }
 
-    /// `k256::NonZeroScalar` doesn't implement `PartialEq`.
+    /// Reimplemented manually, because [`k256::NonZeroScalar`] doesn't implement
+    /// `PartialEq`.
     #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
     impl PartialEq for Scalar {
         fn eq(&self, rhs: &Self) -> bool {
@@ -385,6 +387,26 @@ where
     order
 }
 
+/// Represents an elliptic curve scalar value which might be zero.
+/// Supports all the same constant-time arithmetic operators supported
+/// by [`Scalar`].
+///
+/// `MaybeScalar` should only be used in cases where it is possible for
+/// an input to be zero. In all possible cases, using [`Scalar`] is more
+/// appropriate. The output of arithmetic operations with non-zero `Scalar`s
+/// can result in a `MaybeScalar` - for example, adding two scalars together
+/// linearly.
+///
+/// ```
+/// use secp::{MaybeScalar, Scalar};
+///
+/// let maybe_scalar: MaybeScalar = Scalar::one() + Scalar::one();
+/// ```
+///
+/// This is because the two scalars might represent values which are additive
+/// inverses of each other (i.e. `x + (-x)`), so the output of their addition
+/// can result in zero, which must be checked for by the caller where
+/// appropriate.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum MaybeScalar {
     Zero,
@@ -425,8 +447,8 @@ impl MaybeScalar {
     ///
     /// This is used to reduce malleability of ECDSA signatures, whose `s` values
     /// could be considered valid if they are either `s` or `n - s`. Converting
-    /// the `s` value using `MaybeScalar::to_low` and checking it using
-    /// `MaybeScalar::is_high` upon verification fixes this ambiguity.
+    /// the `s` value using [`MaybeScalar::to_low`] and checking it using
+    /// [`MaybeScalar::is_high`] upon verification fixes this ambiguity.
     ///
     /// Beware that leaking timing information about this bit may expose a bit
     /// of information about the scalar.
@@ -434,12 +456,13 @@ impl MaybeScalar {
         self.ct_gt(&Self::half_order())
     }
 
-    /// If `self.is_high()`, this returns `-self`. Otherwise, returns `self` as-is.
+    /// If [`self.is_high()`][Self::is_high], this returns `-self`. Otherwise,
+    /// returns the original scalar unchanged.
     ///
     /// This is used to reduce malleability of ECDSA signatures, whose `s` values
     /// could be considered valid if they are either `s` or `n - s`. Converting
-    /// the `s` value using `MaybeScalar::to_low` and checking it using
-    /// `MaybeScalar::is_high` upon verification fixes this ambiguity.
+    /// the `s` value using [`MaybeScalar::to_low`] and checking it using
+    /// [`MaybeScalar::is_high`] upon verification fixes this ambiguity.
     pub fn to_low(self) -> MaybeScalar {
         let choice = self.ct_gt(&Self::half_order());
         MaybeScalar::conditional_select(&self, &(-self), choice)
@@ -483,7 +506,7 @@ impl MaybeScalar {
         Scalar::try_from(self)
     }
 
-    /// Coerces the `MaybeScalar` into a `Scalar`. Panics if `self == MaybeScalar::Zero`.
+    /// Coerces the `MaybeScalar` into a [`Scalar`]. Panics if `self == MaybeScalar::Zero`.
     pub fn unwrap(self) -> Scalar {
         match self {
             Valid(point) => point,
@@ -496,7 +519,7 @@ impl MaybeScalar {
     /// in constant time. This modulus must less than or equal to the secp256k1
     /// curve order `n`.
     ///
-    /// Unfortunately libsecp256k1 does not expose this functionality, so we must do
+    /// Unfortunately libsecp256k1 does not expose this functionality, so we have done
     /// our best to reimplement modular reduction in constant time using only scalar
     /// arithmetic on numbers in the  range `[0, n)`.
     ///
@@ -574,7 +597,7 @@ impl MaybeScalar {
     /// Multiplies the secp256k1 base point by this scalar. This is how
     /// public keys (points) are derived from private keys (scalars).
     ///
-    /// If this scalar is `MaybeScalar::Zero`, this method returns `MaybePoint::Infinity`.
+    /// If this scalar is [`MaybeScalar::Zero`], this method returns [`MaybePoint::Infinity`].
     pub fn base_point_mul(&self) -> MaybePoint {
         match self {
             Valid(scalar) => MaybePoint::Valid(scalar.base_point_mul()),
@@ -589,7 +612,7 @@ impl MaybeScalar {
 }
 
 impl Default for MaybeScalar {
-    /// Returns `MaybeScalar::Zero`.
+    /// Returns [`MaybeScalar::Zero`].
     fn default() -> Self {
         MaybeScalar::Zero
     }
@@ -656,7 +679,7 @@ mod conversions {
     use super::*;
 
     impl From<MaybeScalar> for Option<Scalar> {
-        /// Converts `MaybeScalar:Zero` into `None` and a valid `Scalar` into `Some`.
+        /// Converts [`MaybeScalar::Zero`] into `None` and a valid [`Scalar`] into `Some`.
         fn from(maybe_scalar: MaybeScalar) -> Self {
             match maybe_scalar {
                 Valid(scalar) => Some(scalar),
@@ -680,7 +703,7 @@ mod conversions {
     }
 
     impl From<Scalar> for MaybeScalar {
-        /// Converts the scalar into `MaybeScalar::Valid` instance.
+        /// Converts the scalar into [`MaybeScalar::Valid`] instance.
         fn from(scalar: Scalar) -> Self {
             MaybeScalar::Valid(scalar)
         }
@@ -801,7 +824,7 @@ mod encodings {
         /// Parses a scalar from a 32-byte hex string representation.
         ///
         /// If the string is a hex-encoded 32 byte array of zeros, this
-        /// will return `MaybeScalar::Zero`.
+        /// will return [`MaybeScalar::Zero`].
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             // Make sure this comparison is executed in constant time to avoid
             // leaking information about secret scalars during deserialization.
@@ -819,7 +842,7 @@ mod encodings {
         /// Attempts to parse a 32-byte slice as a scalar in the range `[1, n)`
         /// in constant time, where `n` is the curve order.
         ///
-        /// Returns `InvalidScalarBytes` if the integer represented by the bytes
+        /// Returns [`InvalidScalarBytes`] if the integer represented by the bytes
         /// is greater than or equal to the curve order, or if the bytes are all zero.
         ///
         /// Fails if `bytes.len() != 32`.
@@ -841,7 +864,7 @@ mod encodings {
         /// in constant time, where `n` is the curve order. Timing information
         /// may be leaked if `bytes` is all zeros or not the right length.
         ///
-        /// Returns `InvalidScalarBytes` if the integer represented by the bytes
+        /// Returns [`InvalidScalarBytes`] if the integer represented by the bytes
         /// is greater than or equal to the curve order, or if `bytes.len() != 32`.
         fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
             Scalar::try_from(bytes).map(Valid).or_else(|e| {
@@ -862,7 +885,7 @@ mod encodings {
         /// may be leaked if `bytes` is the zero array, but then that's not a
         /// very secret value, is it?
         ///
-        /// Returns `InvalidScalarBytes` if the integer represented by the bytes
+        /// Returns [`InvalidScalarBytes`] if the integer represented by the bytes
         /// is greater than or equal to the curve order.
         fn try_from(bytes: &[u8; 32]) -> Result<Self, Self::Error> {
             Self::try_from(bytes as &[u8])
@@ -875,7 +898,7 @@ mod encodings {
         /// Attempts to parse a 32-byte array as a scalar in the range `[1, n)`
         /// in constant time, where `n` is the curve order.
         ///
-        /// Returns `InvalidScalarBytes` if the integer represented by the bytes
+        /// Returns [`InvalidScalarBytes`] if the integer represented by the bytes
         /// is greater than or equal to the curve order, or if the bytes are all zero.
         fn try_from(bytes: &[u8; 32]) -> Result<Self, Self::Error> {
             Self::try_from(bytes as &[u8])
@@ -888,7 +911,7 @@ mod encodings {
         /// Attempts to parse a 32-byte array as a scalar in the range `[0, n)`
         /// in constant time, where `n` is the curve order.
         ///
-        /// Returns `InvalidScalarBytes` if the integer represented by the bytes
+        /// Returns [`InvalidScalarBytes`] if the integer represented by the bytes
         /// is greater than or equal to the curve order.
         fn try_from(bytes: [u8; 32]) -> Result<Self, Self::Error> {
             Self::try_from(&bytes)
@@ -901,7 +924,7 @@ mod encodings {
         /// Attempts to parse a 32-byte array as a scalar in the range `[1, n)`
         /// in constant time, where `n` is the curve order.
         ///
-        /// Returns `InvalidScalarBytes` if the integer represented by the bytes
+        /// Returns [`InvalidScalarBytes`] if the integer represented by the bytes
         /// is greater than or equal to the curve order, or if the bytes are all zero.
         fn try_from(bytes: [u8; 32]) -> Result<Self, Self::Error> {
             Self::try_from(&bytes)
@@ -949,10 +972,9 @@ mod subtle_traits {
 
     impl ConditionallySelectable for MaybeScalar {
         /// Conditionally selects one of two scalars in constant time. The exception is if
-        /// either `a` or `b` are `MaybeScalar::Zero`, in which case timing information
+        /// either `a` or `b` are [`MaybeScalar::Zero`], in which case timing information
         /// about this fact may be leaked. No timing information about the value
         /// of a non-zero scalar will be leaked.
-        #[inline]
         fn conditional_select(&a: &Self, &b: &Self, choice: subtle::Choice) -> Self {
             #[cfg(feature = "secp256k1")]
             return {
@@ -966,11 +988,11 @@ mod subtle_traits {
                 let a_inner = a
                     .into_option()
                     .map(|scalar| scalar.inner.as_ref().clone())
-                    .unwrap_or(k256::Scalar::ZERO);
+                    .unwrap_or(k256::Scalar::Zero);
                 let b_inner = b
                     .into_option()
                     .map(|scalar| scalar.inner.as_ref().clone())
-                    .unwrap_or(k256::Scalar::ZERO);
+                    .unwrap_or(k256::Scalar::Zero);
 
                 let inner_scalar = k256::Scalar::conditional_select(&a_inner, &b_inner, choice);
 
@@ -1027,11 +1049,11 @@ mod subtle_traits {
     impl subtle::ConstantTimeLess for MaybeScalar {}
 }
 
-/// This implementation allows iterators of `Scalar` or `MaybeScalar`
-/// to be summed with `Iterator::sum()`.
+/// This implementation allows iterators of [`Scalar`] or [`MaybeScalar`]
+/// to be summed with [`Iterator::sum`].
 ///
-/// Here the type `S` may be either `Scalar` or `MaybeScalar`, or
-/// any other type which can be summed with a `MaybeScalar`.
+/// Here the type `S` may be either [`Scalar`] or [`MaybeScalar`], or
+/// any other type which can be summed with a [`MaybeScalar`].
 ///
 /// ```
 /// use secp::{Scalar, MaybeScalar};
@@ -1067,8 +1089,8 @@ where
     }
 }
 
-/// This implementation allows iterators of `Scalar`
-/// to be multiplied together with `Iterator::product()`.
+/// This implementation allows iterators of [`Scalar`]
+/// to be multiplied together with [`Iterator::product`].
 ///
 /// Since all scalars in the iterator are guaranteed to
 /// be non-zero, the resulting product is also guaranteed
@@ -1100,11 +1122,11 @@ impl std::iter::Product<Scalar> for Scalar {
     }
 }
 
-/// This implementation allows iterators of `Scalar` or `MaybeScalar`
-/// to be multiplied together with `Iterator::product()`.
+/// This implementation allows iterators of [`Scalar`] or [`MaybeScalar`]
+/// to be multiplied together with [`Iterator::product`].
 ///
-/// Here the type `S` may be either `Scalar` or `MaybeScalar`, or
-/// any other type which can be multiplied with a `MaybeScalar`.
+/// Here the type `S` may be either [`Scalar`] or [`MaybeScalar`], or
+/// any other type which can be multiplied with a [`MaybeScalar`].
 ///
 /// ```
 /// use secp::{Scalar, MaybeScalar};
@@ -1380,19 +1402,19 @@ mod tests {
             MaybeScalar::from(100)
         );
 
-        // ZERO + Scalar
+        // Zero + Scalar
         assert_eq!(MaybeScalar::Zero + Scalar::from(20), MaybeScalar::from(20));
 
-        // ZERO + MaybeScalar
+        // Zero + MaybeScalar
         assert_eq!(
             MaybeScalar::Zero + MaybeScalar::from(20),
             MaybeScalar::from(20)
         );
 
-        // Scalar + ZERO
+        // Scalar + Zero
         assert_eq!(Scalar::from(20) + MaybeScalar::Zero, MaybeScalar::from(20));
 
-        // MaybeScalar + ZERO
+        // MaybeScalar + Zero
         assert_eq!(
             MaybeScalar::from(20) + MaybeScalar::Zero,
             MaybeScalar::from(20)
@@ -1521,16 +1543,16 @@ mod tests {
             MaybeScalar::from(75)
         );
 
-        // ZERO * Scalar
+        // Zero * Scalar
         assert_eq!(MaybeScalar::Zero * Scalar::from(45), MaybeScalar::Zero);
 
-        // ZERO * MaybeScalar
+        // Zero * MaybeScalar
         assert_eq!(MaybeScalar::Zero * MaybeScalar::from(45), MaybeScalar::Zero);
 
-        // Scalar * ZERO
+        // Scalar * Zero
         assert_eq!(Scalar::from(30) * MaybeScalar::Zero, MaybeScalar::Zero);
 
-        // MaybeScalar * ZERO
+        // MaybeScalar * Zero
         assert_eq!(MaybeScalar::from(30) * MaybeScalar::Zero, MaybeScalar::Zero);
 
         // MaybeScalar * MaybeScalar

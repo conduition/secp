@@ -30,13 +30,13 @@ static GENERATOR_POINT: Lazy<Point> =
     Lazy::new(|| Point::try_from(&GENERATOR_POINT_BYTES).unwrap());
 
 /// Represents a valid non-infinity point on the secp256k1 curve.
-/// Internally this wraps either `secp256k1::PublicKey` or `k256::PublicKey`
+/// Internally this wraps either [`secp256k1::PublicKey`] or [`k256::PublicKey`]
 /// depending on which feature set is enabled.
 ///
 /// `Point` supports constant time arithmetic operations using addition,
 /// subtraction, negation, and multiplication with other types in this crate.
 ///
-/// Curve arithmetic is performed using traits from `std::ops`.
+/// Curve arithmetic is performed using traits from [`std::ops`].
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "secp256k1", derive(Ord, PartialOrd))]
 pub struct Point {
@@ -207,7 +207,7 @@ impl Point {
     /// `Point`, including `Point` itself, or `&Point`.
     ///
     /// `Point::sum(points)` should be preferred over summing up the `points`
-    /// one at a time. This function offloads most of the work to libsecp256k1,
+    /// one at a time. This function offloads most of the work to `libsecp256k1`,
     /// reducing overhead if the `secp256k1` crate feature is enabled.
     pub fn sum<T>(points: impl IntoIterator<Item = T>) -> MaybePoint
     where
@@ -241,7 +241,7 @@ impl Point {
         };
     }
 
-    /// Negates the point, returning the point `P` such that `self + P = MaybePoint::Infinity`
+    /// Negates the point, returning the point `P` such that `self + P = MaybePoint::Infinity`.
     /// Always returns a non-infinity point.
     ///
     /// This method uses a specific `libsecp256k1` context object instead of the global
@@ -266,7 +266,7 @@ impl Point {
     }
 
     /// Subtracts two points, returning `self - other`. This computes the point `P` such
-    /// that `self + P = other`. Returns `MaybePoint::Infinity` if `self == other`.
+    /// that `self + P = other`. Returns [`MaybePoint::Infinity`] if `self == other`.
     /// Returns `self` if `other == MaybePoint::Infinity`.
     ///
     /// This method uses a specific `libsecp256k1` context object instead of the global
@@ -297,8 +297,8 @@ impl Point {
         )
     }
 
-    /// Multiplies the point by the given scalar. Returns `MaybePoint::Infinity`
-    /// if `scalar == MaybeScalar::ZERO`.
+    /// Multiplies the point by the given scalar. Returns [`MaybePoint::Infinity`]
+    /// if `scalar == MaybeScalar::Zero`.
     ///
     /// This method uses a specific `libsecp256k1` context object instead of the global
     /// context used by the `std::ops` implementations.
@@ -358,7 +358,7 @@ mod non_identity_conversions {
 
     #[cfg(feature = "secp256k1")]
     impl From<(secp256k1::XOnlyPublicKey, secp256k1::Parity)> for Point {
-        /// Converts an X-only public key with a given parity into a `Point`.
+        /// Converts an X-only public key with a given parity into a [`Point`].
         fn from((xonly, parity): (secp256k1::XOnlyPublicKey, secp256k1::Parity)) -> Self {
             let pk = secp256k1::PublicKey::from_x_only_public_key(xonly, parity);
             Point::from(pk)
@@ -377,7 +377,7 @@ mod non_identity_conversions {
     }
 }
 
-/// Need to implement this manually because `k256::PublicKey` does not implement `Hash`.
+/// Need to implement this manually because [`k256::PublicKey`] does not implement `Hash`.
 impl std::hash::Hash for Point {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.serialize().hash(state);
@@ -391,14 +391,14 @@ impl std::fmt::Debug for Point {
     }
 }
 
-/// The `k256` crate implements `Ord` based on uncompressed encoding.
-/// To match BIP327, we must sort keys based on their compressed encoding.
 #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
 mod pubkey_ord {
     use super::*;
 
     impl Ord for Point {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            // The `k256` crate implements `Ord` based on uncompressed encoding.
+            // To match BIP327, we must sort keys based on their compressed encoding.
             self.inner
                 .to_encoded_point(true)
                 .cmp(&other.inner.to_encoded_point(true))
@@ -412,8 +412,8 @@ mod pubkey_ord {
     }
 }
 
-/// This type is effectively the same as `Point`, except it can also
-/// represent the point at infinity, exposed as `MaybePoint::Infinity`.
+/// This type is effectively the same as [`Point`], except it can also
+/// represent the point at infinity, exposed as [`MaybePoint::Infinity`].
 /// This is the special 'zero-point', or 'identity element' on the curve
 /// for which `MaybePoint::Infinity + X = X`  and
 /// `MaybePoint::Infinity * X = MaybePoint::Infinity` for any other point `X`.
@@ -422,6 +422,8 @@ pub enum MaybePoint {
     /// Represents the point at infinity, for which `MaybePoint::Infinity + X = X`
     /// and `MaybePoint::Infinity * X = MaybePoint::Infinity` for any other point `X`.
     Infinity,
+
+    /// Represents a valid non-infinity curve point.
     Valid(Point),
 }
 
@@ -461,7 +463,7 @@ impl MaybePoint {
     /// Parses a point from a given hex string, which can be in compressed
     /// or uncompressed format.
     ///
-    /// Returns `MaybePoint::Infinity` if the input is 33-hex-encoded zero bytes.
+    /// Returns [`MaybePoint::Infinity`] if the input is 33-hex-encoded zero bytes.
     pub fn from_hex(hex: &str) -> Result<Self, InvalidPointString> {
         if bool::from(hex.as_bytes().ct_eq(POINT_INFINITY_STR.as_bytes())) {
             return Ok(MaybePoint::Infinity);
@@ -471,7 +473,7 @@ impl MaybePoint {
 
     /// Aggregate an iterator of points together by simple summation.
     /// The iterator item type `T` can be any type that borrows as a
-    /// `MaybePoint`, including `MaybePoint` itself, or `&MaybePoint`.
+    /// [`MaybePoint`], including `MaybePoint` itself, or `&MaybePoint`.
     ///
     /// `MaybePoint::sum(maybe_points)` should be preferred over summing up
     /// the `maybe_points` one at a time. This function offloads most of the
@@ -491,7 +493,7 @@ impl MaybePoint {
     }
 
     /// Negates the point, returning the point `P` such that `self + P = MaybePoint::Infinity`
-    /// Returns `MaybePoint::Infinity` if `self == MaybePoint::Infinity`.
+    /// Returns [`MaybePoint::Infinity`] if `self == MaybePoint::Infinity`.
     ///
     /// This method uses a specific `libsecp256k1` context object instead of the global
     /// context used by the `std::ops` implementations.
@@ -504,7 +506,7 @@ impl MaybePoint {
     }
 
     /// Subtracts two points, returning `self - other`. This computes the point `P` such
-    /// that `self + P = other`. Returns `MaybePoint::Infinity` if `self == other`.
+    /// that `self + P = other`. Returns [`MaybePoint::Infinity`] if `self == other`.
     /// Returns `-other` if `self == MaybePoint::Infinity`.
     ///
     /// This method uses a specific `libsecp256k1` context object instead of the global
@@ -519,7 +521,7 @@ impl MaybePoint {
     }
 
     /// Subtracts two points, returning `self - other`. This computes the point `P` such
-    /// that `self + P = other`. Returns `MaybePoint::Infinity` if `self == other`.
+    /// that `self + P = other`. Returns [`MaybePoint::Infinity`] if `self == other`.
     /// Returns `self` if `other == MaybePoint::Infinity`.
     ///
     /// This method uses a specific `libsecp256k1` context object instead of the global
@@ -533,7 +535,7 @@ impl MaybePoint {
         self + other.negate(secp)
     }
 
-    /// Multiplies the point by the given scalar. Returns `MaybePoint::Infinity`
+    /// Multiplies the point by the given scalar. Returns[ `MaybePoint::Infinity`]
     /// if `self == MaybePoint::Infinity`.
     ///
     /// This method uses a specific `libsecp256k1` context object instead of the global
@@ -550,8 +552,8 @@ impl MaybePoint {
         }
     }
 
-    /// Multiplies the point by a scalar. Returns `MaybePoint::Infinity` if
-    /// `self == MaybePoint::Infinity || scalar == MaybeScalar::ZERO`.
+    /// Multiplies the point by a scalar. Returns [`MaybePoint::Infinity`] if
+    /// `self == MaybePoint::Infinity || scalar == MaybeScalar::Zero`.
     ///
     /// This method uses a specific `libsecp256k1` context object instead of the global
     /// context used by the `std::ops` implementations.
@@ -581,7 +583,7 @@ impl MaybePoint {
         Point::try_from(self)
     }
 
-    /// Coerces the `MaybePoint` into a valid `Point`. Panics if `self == MaybePoint::Infinity`.
+    /// Coerces the `MaybePoint` into a valid [`Point`]. Panics if `self == MaybePoint::Infinity`.
     pub fn unwrap(self) -> Point {
         match self {
             Valid(point) => point,
@@ -741,7 +743,7 @@ mod encodings {
         /// Parses a point from a compressed or uncompressed DER encoded hex string.
         /// The input string should be either 33 or 65 bytes, hex-encoded.
         ///
-        /// Returns `MaybePoint::Infinity` if the input is 33-hex-encoded zero bytes.
+        /// Returns [`MaybePoint::Infinity`] if the input is 33-hex-encoded zero bytes.
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             Self::from_hex(s)
         }
@@ -751,11 +753,11 @@ mod encodings {
         type Error = InvalidPointBytes;
 
         /// Parses a compressed or uncompressed DER encoding of a point. See
-        /// `Point::serialize` and `Point::serialize_uncompressed`. The slice
+        /// [`Point::serialize`] and [`Point::serialize_uncompressed`]. The slice
         /// length should be either 33 or 65 for compressed and uncompressed
         /// encodings respectively.
         ///
-        /// Returns `InvalidPointBytes` if the bytes do not represent a valid
+        /// Returns [`InvalidPointBytes`] if the bytes do not represent a valid
         /// non-infinity curve point.
         fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
             #[cfg(feature = "secp256k1")]
@@ -774,9 +776,9 @@ mod encodings {
         type Error = InvalidPointBytes;
 
         /// Parses a compressed or uncompressed DER encoding of a point. See
-        /// `MaybePoint::serialize` and `MaybePoint::serialize_uncompressed`.
+        /// [`MaybePoint::serialize`] and [`MaybePoint::serialize_uncompressed`].
         ///
-        /// Returns `InvalidPointBytes` if the bytes do not represent a valid
+        /// Returns [`InvalidPointBytes`] if the bytes do not represent a valid
         /// curve point, or if `bytes.len()` is neither 33 nor 65.
         ///
         /// Also accepts 33 or 65 zero bytes, which is interpreted as the point
@@ -792,8 +794,8 @@ mod encodings {
     impl TryFrom<&[u8; 33]> for Point {
         type Error = InvalidPointBytes;
 
-        /// Parses a compressed DER encoding of a point. See `Point::serialize`.
-        /// Returns `InvalidPointBytes` if the bytes do not represent a valid
+        /// Parses a compressed DER encoding of a point. See [`Point::serialize`].
+        /// Returns [`InvalidPointBytes`] if the bytes do not represent a valid
         /// non-infinity curve point.
         fn try_from(bytes: &[u8; 33]) -> Result<Self, Self::Error> {
             Self::try_from(bytes as &[u8])
@@ -803,8 +805,8 @@ mod encodings {
     impl TryFrom<&[u8; 33]> for MaybePoint {
         type Error = InvalidPointBytes;
 
-        /// Parses a compressed DER encoding of a point. See `Point::serialize`.
-        /// Returns `InvalidPointBytes` if the bytes do not represent a valid
+        /// Parses a compressed DER encoding of a point. See [`MaybePoint::serialize`].
+        /// Returns [`InvalidPointBytes`] if the bytes do not represent a valid
         /// curve point.
         ///
         /// Also accepts 33 zero bytes, which is interpreted as the point at infinity.
@@ -846,16 +848,16 @@ mod encodings {
     impl TryFrom<&[u8; 65]> for Point {
         type Error = InvalidPointBytes;
 
-        /// Parses an uncompressed DER encoding of a point. See `Point::serialize_uncompressed`.
-        /// Returns `InvalidPointBytes` if the bytes do not represent a valid
+        /// Parses an uncompressed DER encoding of a point. See [`Point::serialize_uncompressed`].
+        /// Returns [`InvalidPointBytes`] if the bytes do not represent a valid
         /// non-infinity curve point.
         fn try_from(bytes: &[u8; 65]) -> Result<Self, Self::Error> {
             Self::try_from(bytes as &[u8])
         }
     }
 
-    /// Parses an uncompressed DER encoding of a point. See `Point::serialize_uncompressed`.
-    /// Returns `InvalidPointBytes` if the bytes do not represent a valid
+    /// Parses an uncompressed DER encoding of a point. See [`MaybePoint::serialize_uncompressed`].
+    /// Returns [`InvalidPointBytes`] if the bytes do not represent a valid
     /// curve point.
     ///
     /// Also accepts 65 zero bytes, which is interpreted as the point at infinity.
@@ -960,8 +962,8 @@ impl ConditionallySelectable for MaybePoint {
     }
 }
 
-/// The type `P` can be either `Point` or `MaybePoint`, or any type
-/// that converts to `MaybePoint`. This allows iterators of this type
+/// The type `P` can be either [`Point`] or [`MaybePoint`], or any type
+/// that converts to [`MaybePoint`]. This allows iterators of this type
 /// `P` to be summed to an elliptic curve point efficiently.
 impl<P> std::iter::Sum<P> for MaybePoint
 where
