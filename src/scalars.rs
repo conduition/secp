@@ -155,7 +155,13 @@ impl Scalar {
     /// which must be exactly 32-byte long and must represent the scalar in
     /// big-endian format.
     pub fn from_slice(bytes: &[u8]) -> Result<Self, InvalidScalarBytes> {
-        Self::try_from(bytes)
+        #[cfg(feature = "secp256k1")]
+        let inner = secp256k1::SecretKey::from_slice(bytes).map_err(|_| InvalidScalarBytes)?;
+
+        #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
+        let inner = k256::NonZeroScalar::try_from(bytes).map_err(|_| InvalidScalarBytes)?;
+
+        Ok(Scalar::from(inner))
     }
 
     /// Parses a `Scalar` from a 32-byte hex string representation.
@@ -234,88 +240,6 @@ impl Scalar {
         // this will never be zero, because `z` is in the range `[0, n-1)`
         (reduced + Scalar::one()).unwrap()
     }
-}
-
-mod nonzero_conversions {
-    use super::*;
-
-    #[cfg(feature = "secp256k1")]
-    impl AsRef<secp256k1::SecretKey> for Scalar {
-        fn as_ref(&self) -> &secp256k1::SecretKey {
-            &self.inner
-        }
-    }
-
-    #[cfg(feature = "secp256k1")]
-    impl From<Scalar> for secp256k1::SecretKey {
-        fn from(scalar: Scalar) -> secp256k1::SecretKey {
-            scalar.inner
-        }
-    }
-
-    #[cfg(feature = "secp256k1")]
-    impl From<Scalar> for secp256k1::Scalar {
-        fn from(scalar: Scalar) -> Self {
-            secp256k1::Scalar::from(scalar.inner)
-        }
-    }
-
-    #[cfg(feature = "k256")]
-    impl From<Scalar> for k256::NonZeroScalar {
-        fn from(scalar: Scalar) -> Self {
-            // TODO maybe there's a better method to parse NonZeroScalar?
-            #[cfg(feature = "secp256k1")]
-            return k256::NonZeroScalar::try_from(scalar.serialize().as_ref()).unwrap();
-
-            #[cfg(not(feature = "secp256k1"))]
-            return scalar.inner;
-        }
-    }
-
-    #[cfg(feature = "k256")]
-    impl From<Scalar> for k256::SecretKey {
-        fn from(scalar: Scalar) -> Self {
-            k256::SecretKey::from(k256::NonZeroScalar::from(scalar))
-        }
-    }
-}
-
-mod std_traits {
-    use super::*;
-
-    /// This implementation was duplicated from the [`secp256k1`] crate, because
-    /// [`k256::NonZeroScalar`] doesn't implement `Debug`.
-    impl std::fmt::Debug for Scalar {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            use std::hash::Hasher as _;
-            const DEBUG_HASH_TAG: &[u8] = &[
-                0x66, 0xa6, 0x77, 0x1b, 0x9b, 0x6d, 0xae, 0xa1, 0xb2, 0xee, 0x4e, 0x07, 0x49, 0x4a,
-                0xac, 0x87, 0xa9, 0xb8, 0x5b, 0x4b, 0x35, 0x02, 0xaa, 0x6d, 0x0f, 0x79, 0xcb, 0x63,
-                0xe6, 0xf8, 0x66, 0x22,
-            ]; // =SHA256(b"rust-secp256k1DEBUG");
-
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
-            hasher.write(DEBUG_HASH_TAG);
-            hasher.write(DEBUG_HASH_TAG);
-            hasher.write(&self.serialize());
-            let hash = hasher.finish();
-
-            f.debug_tuple(stringify!(Scalar))
-                .field(&format_args!("#{:016x}", hash))
-                .finish()
-        }
-    }
-
-    /// Reimplemented manually, because [`k256::NonZeroScalar`] doesn't implement
-    /// `PartialEq`.
-    #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
-    impl PartialEq for Scalar {
-        fn eq(&self, rhs: &Self) -> bool {
-            self.inner.ct_eq(&rhs.inner).into()
-        }
-    }
-
-    impl Eq for Scalar {}
 }
 
 // Perform elementwise XOR on two arrays and return the resulting output array.
@@ -481,11 +405,19 @@ impl MaybeScalar {
         }
     }
 
-    /// Parses a non-zero scalar in the range `[1, n)` from a given byte slice,
+    /// Parses a non-zero scalar in the range `[0, n)` from a given byte slice,
     /// which must be exactly 32-byte long and must represent the scalar in
     /// big-endian format.
     pub fn from_slice(bytes: &[u8]) -> Result<Self, InvalidScalarBytes> {
-        Self::try_from(bytes)
+        Scalar::try_from(bytes)
+            .map(MaybeScalar::Valid)
+            .or_else(|e| {
+                if bool::from(bytes.ct_eq(&[0; 32])) {
+                    Ok(MaybeScalar::Zero)
+                } else {
+                    Err(e)
+                }
+            })
     }
 
     /// Parses a `MaybeScalar` from a 32-byte hex string representation.
@@ -611,66 +543,47 @@ impl MaybeScalar {
     }
 }
 
-impl Default for MaybeScalar {
-    /// Returns [`MaybeScalar::Zero`].
-    fn default() -> Self {
-        MaybeScalar::Zero
-    }
-}
-
-#[cfg(feature = "secp256k1")]
-mod as_ref_conversions {
+mod std_traits {
     use super::*;
 
-    impl AsRef<[u8; 32]> for Scalar {
-        /// Returns a reference to the underlying secret bytes of this scalar.
-        ///
-        /// # Warning
-        ///
-        /// Use cautiously. Non-constant time operations on these bytes
-        /// could reveal secret key material.
-        fn as_ref(&self) -> &[u8; 32] {
-            return self.inner.as_ref();
+    /// This implementation was duplicated from the [`secp256k1`] crate, because
+    /// [`k256::NonZeroScalar`] doesn't implement `Debug`.
+    impl std::fmt::Debug for Scalar {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            use std::hash::Hasher as _;
+            const DEBUG_HASH_TAG: &[u8] = &[
+                0x66, 0xa6, 0x77, 0x1b, 0x9b, 0x6d, 0xae, 0xa1, 0xb2, 0xee, 0x4e, 0x07, 0x49, 0x4a,
+                0xac, 0x87, 0xa9, 0xb8, 0x5b, 0x4b, 0x35, 0x02, 0xaa, 0x6d, 0x0f, 0x79, 0xcb, 0x63,
+                0xe6, 0xf8, 0x66, 0x22,
+            ]; // =SHA256(b"rust-secp256k1DEBUG");
+
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            hasher.write(DEBUG_HASH_TAG);
+            hasher.write(DEBUG_HASH_TAG);
+            hasher.write(&self.serialize());
+            let hash = hasher.finish();
+
+            f.debug_tuple(stringify!(Scalar))
+                .field(&format_args!("#{:016x}", hash))
+                .finish()
         }
     }
 
-    impl AsRef<[u8; 32]> for MaybeScalar {
-        /// Returns a reference to the underlying secret bytes of this scalar.
-        ///
-        /// # Warning
-        ///
-        /// Use cautiously. Non-constant time operations on these bytes
-        /// could reveal secret key material.
-        fn as_ref(&self) -> &[u8; 32] {
-            const EMPTY: [u8; 32] = [0; 32];
-            match self {
-                Valid(ref scalar) => scalar.as_ref(),
-                Zero => &EMPTY,
-            }
+    /// Reimplemented manually, because [`k256::NonZeroScalar`] doesn't implement
+    /// `PartialEq`.
+    #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
+    impl PartialEq for Scalar {
+        fn eq(&self, rhs: &Self) -> bool {
+            self.inner.ct_eq(&rhs.inner).into()
         }
     }
 
-    impl AsRef<[u8]> for Scalar {
-        /// Returns a reference to the underlying secret bytes of this scalar.
-        ///
-        /// # Warning
-        ///
-        /// Use cautiously. Non-constant time operations on these bytes
-        /// could reveal secret key material.
-        fn as_ref(&self) -> &[u8] {
-            <Self as AsRef<[u8; 32]>>::as_ref(self) as &[u8]
-        }
-    }
+    impl Eq for Scalar {}
 
-    impl AsRef<[u8]> for MaybeScalar {
-        /// Returns a reference to the underlying secret bytes of this scalar.
-        ///
-        /// # Warning
-        ///
-        /// Use cautiously. Non-constant time operations on these bytes
-        /// could reveal secret key material.
-        fn as_ref(&self) -> &[u8] {
-            <Self as AsRef<[u8; 32]>>::as_ref(self) as &[u8]
+    impl Default for MaybeScalar {
+        /// Returns [`MaybeScalar::Zero`].
+        fn default() -> Self {
+            MaybeScalar::Zero
         }
     }
 }
@@ -678,79 +591,310 @@ mod as_ref_conversions {
 mod conversions {
     use super::*;
 
-    impl From<MaybeScalar> for Option<Scalar> {
-        /// Converts [`MaybeScalar::Zero`] into `None` and a valid [`Scalar`] into `Some`.
-        fn from(maybe_scalar: MaybeScalar) -> Self {
-            match maybe_scalar {
-                Valid(scalar) => Some(scalar),
-                Zero => None,
+    #[cfg(feature = "secp256k1")]
+    mod as_ref_conversions {
+        use super::*;
+
+        impl AsRef<secp256k1::SecretKey> for Scalar {
+            fn as_ref(&self) -> &secp256k1::SecretKey {
+                &self.inner
+            }
+        }
+
+        impl AsRef<[u8; 32]> for Scalar {
+            /// Returns a reference to the underlying secret bytes of this scalar.
+            ///
+            /// # Warning
+            ///
+            /// Use cautiously. Non-constant time operations on these bytes
+            /// could reveal secret key material.
+            fn as_ref(&self) -> &[u8; 32] {
+                return self.inner.as_ref();
+            }
+        }
+
+        impl AsRef<[u8; 32]> for MaybeScalar {
+            /// Returns a reference to the underlying secret bytes of this scalar.
+            ///
+            /// # Warning
+            ///
+            /// Use cautiously. Non-constant time operations on these bytes
+            /// could reveal secret key material.
+            fn as_ref(&self) -> &[u8; 32] {
+                const EMPTY: [u8; 32] = [0; 32];
+                match self {
+                    Valid(ref scalar) => scalar.as_ref(),
+                    Zero => &EMPTY,
+                }
+            }
+        }
+
+        impl AsRef<[u8]> for Scalar {
+            /// Returns a reference to the underlying secret bytes of this scalar.
+            ///
+            /// # Warning
+            ///
+            /// Use cautiously. Non-constant time operations on these bytes
+            /// could reveal secret key material.
+            fn as_ref(&self) -> &[u8] {
+                <Self as AsRef<[u8; 32]>>::as_ref(self) as &[u8]
+            }
+        }
+
+        impl AsRef<[u8]> for MaybeScalar {
+            /// Returns a reference to the underlying secret bytes of this scalar.
+            ///
+            /// # Warning
+            ///
+            /// Use cautiously. Non-constant time operations on these bytes
+            /// could reveal secret key material.
+            fn as_ref(&self) -> &[u8] {
+                <Self as AsRef<[u8; 32]>>::as_ref(self) as &[u8]
             }
         }
     }
 
-    impl TryFrom<MaybeScalar> for Scalar {
-        type Error = ZeroScalarError;
+    mod std_conversions {
+        use super::*;
 
-        /// Converts the `MaybeScalar` into a `Result<Scalar, ZeroScalarError>`,
-        /// returning `Ok(Scalar)` if the scalar is a valid non-zero number,
-        /// or `Err(ZeroScalarError)` if `maybe_scalar == MaybeScalar::Zero`.
-        fn try_from(maybe_scalar: MaybeScalar) -> Result<Self, Self::Error> {
-            match maybe_scalar {
-                Valid(scalar) => Ok(scalar),
-                Zero => Err(ZeroScalarError),
+        impl From<MaybeScalar> for Option<Scalar> {
+            /// Converts [`MaybeScalar::Zero`] into `None` and a valid [`Scalar`] into `Some`.
+            fn from(maybe_scalar: MaybeScalar) -> Self {
+                match maybe_scalar {
+                    Valid(scalar) => Some(scalar),
+                    Zero => None,
+                }
+            }
+        }
+
+        /// Converts any unsigned integer number into a `Scalar`.
+        /// Returns [`ZeroScalarError`] if the integer is zero.
+        impl TryFrom<u128> for Scalar {
+            type Error = ZeroScalarError;
+            fn try_from(value: u128) -> Result<Self, Self::Error> {
+                MaybeScalar::from(value).not_zero()
+            }
+        }
+
+        /// Converts any unsigned integer number into a MaybeScalar.
+        impl From<u128> for MaybeScalar {
+            fn from(value: u128) -> Self {
+                if value == 0 {
+                    return Zero;
+                }
+
+                let mut arr = [0; 32];
+                arr[16..].clone_from_slice(&value.to_be_bytes());
+
+                #[cfg(feature = "secp256k1")]
+                let inner = secp256k1::SecretKey::from_slice(&arr).unwrap();
+
+                #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
+                let inner = k256::NonZeroScalar::from_repr(arr.into()).unwrap();
+
+                MaybeScalar::from(inner)
             }
         }
     }
 
-    impl From<Scalar> for MaybeScalar {
-        /// Converts the scalar into [`MaybeScalar::Valid`] instance.
-        fn from(scalar: Scalar) -> Self {
-            MaybeScalar::Valid(scalar)
+    mod internal_conversions {
+        use super::*;
+
+        impl From<Scalar> for MaybeScalar {
+            /// Converts the scalar into a [`MaybeScalar::Valid`] instance.
+            fn from(scalar: Scalar) -> Self {
+                MaybeScalar::Valid(scalar)
+            }
+        }
+
+        impl TryFrom<MaybeScalar> for Scalar {
+            type Error = ZeroScalarError;
+
+            /// Converts the `MaybeScalar` into a `Result<Scalar, ZeroScalarError>`,
+            /// returning `Ok(Scalar)` if the scalar is a valid non-zero number,
+            /// or `Err(ZeroScalarError)` if `maybe_scalar == MaybeScalar::Zero`.
+            fn try_from(maybe_scalar: MaybeScalar) -> Result<Self, Self::Error> {
+                match maybe_scalar {
+                    Valid(scalar) => Ok(scalar),
+                    Zero => Err(ZeroScalarError),
+                }
+            }
         }
     }
 
     #[cfg(feature = "secp256k1")]
-    impl From<secp256k1::SecretKey> for Scalar {
-        fn from(inner: secp256k1::SecretKey) -> Self {
-            Scalar { inner }
-        }
-    }
+    mod secp256k1_conversions {
+        use super::*;
 
-    #[cfg(feature = "secp256k1")]
-    impl From<secp256k1::SecretKey> for MaybeScalar {
-        fn from(sk: secp256k1::SecretKey) -> Self {
-            MaybeScalar::Valid(Scalar::from(sk))
+        mod secret_key {
+            use super::*;
+
+            impl From<secp256k1::SecretKey> for Scalar {
+                fn from(inner: secp256k1::SecretKey) -> Self {
+                    Scalar { inner }
+                }
+            }
+
+            impl From<secp256k1::SecretKey> for MaybeScalar {
+                fn from(inner: secp256k1::SecretKey) -> Self {
+                    MaybeScalar::Valid(Scalar::from(inner))
+                }
+            }
+
+            impl From<Scalar> for secp256k1::SecretKey {
+                fn from(scalar: Scalar) -> secp256k1::SecretKey {
+                    scalar.inner
+                }
+            }
+
+            impl TryFrom<MaybeScalar> for secp256k1::SecretKey {
+                type Error = ZeroScalarError;
+                fn try_from(maybe_scalar: MaybeScalar) -> Result<Self, Self::Error> {
+                    Ok(maybe_scalar.not_zero()?.inner)
+                }
+            }
+        }
+
+        mod scalar {
+            use super::*;
+
+            impl From<secp256k1::Scalar> for Scalar {
+                fn from(scalar: secp256k1::Scalar) -> Self {
+                    Scalar::try_from(scalar.to_be_bytes()).unwrap()
+                }
+            }
+
+            impl From<secp256k1::Scalar> for MaybeScalar {
+                fn from(scalar: secp256k1::Scalar) -> Self {
+                    MaybeScalar::Valid(Scalar::from(scalar))
+                }
+            }
+
+            impl From<Scalar> for secp256k1::Scalar {
+                fn from(scalar: Scalar) -> Self {
+                    secp256k1::Scalar::from(scalar.inner)
+                }
+            }
+
+            impl TryFrom<MaybeScalar> for secp256k1::Scalar {
+                type Error = ZeroScalarError;
+                fn try_from(maybe_scalar: MaybeScalar) -> Result<Self, Self::Error> {
+                    Ok(secp256k1::Scalar::from(maybe_scalar.not_zero()?))
+                }
+            }
         }
     }
 
     #[cfg(feature = "k256")]
-    impl From<k256::NonZeroScalar> for Scalar {
-        fn from(nz_scalar: k256::NonZeroScalar) -> Self {
-            #[cfg(feature = "secp256k1")]
-            return Scalar::try_from(<[u8; 32]>::from(nz_scalar.to_bytes())).unwrap();
+    mod k256_conversions {
+        use super::*;
 
-            #[cfg(not(feature = "secp256k1"))]
-            return Scalar { inner: nz_scalar };
+        mod non_zero_scalar {
+            use super::*;
+
+            impl From<k256::NonZeroScalar> for Scalar {
+                fn from(nz_scalar: k256::NonZeroScalar) -> Self {
+                    #[cfg(feature = "secp256k1")]
+                    return Scalar::try_from(<[u8; 32]>::from(nz_scalar.to_bytes())).unwrap();
+
+                    #[cfg(not(feature = "secp256k1"))]
+                    return Scalar { inner: nz_scalar };
+                }
+            }
+
+            impl From<k256::NonZeroScalar> for MaybeScalar {
+                fn from(nz_scalar: k256::NonZeroScalar) -> Self {
+                    MaybeScalar::Valid(Scalar::from(nz_scalar))
+                }
+            }
+
+            impl From<Scalar> for k256::NonZeroScalar {
+                fn from(scalar: Scalar) -> Self {
+                    #[cfg(feature = "secp256k1")]
+                    return k256::NonZeroScalar::from_repr(scalar.serialize().into()).unwrap();
+
+                    #[cfg(not(feature = "secp256k1"))]
+                    return scalar.inner;
+                }
+            }
+
+            impl TryFrom<MaybeScalar> for k256::NonZeroScalar {
+                type Error = ZeroScalarError;
+                fn try_from(maybe_scalar: MaybeScalar) -> Result<Self, Self::Error> {
+                    Ok(k256::NonZeroScalar::from(maybe_scalar.not_zero()?))
+                }
+            }
         }
-    }
 
-    #[cfg(feature = "k256")]
-    impl From<k256::NonZeroScalar> for MaybeScalar {
-        fn from(nz_scalar: k256::NonZeroScalar) -> Self {
-            MaybeScalar::Valid(Scalar::from(nz_scalar))
+        mod scalar {
+            use super::*;
+
+            impl TryFrom<k256::Scalar> for Scalar {
+                type Error = ZeroScalarError;
+                fn try_from(scalar: k256::Scalar) -> Result<Self, Self::Error> {
+                    MaybeScalar::from(scalar).not_zero()
+                }
+            }
+
+            impl From<k256::Scalar> for MaybeScalar {
+                fn from(scalar: k256::Scalar) -> Self {
+                    #[cfg(feature = "secp256k1")]
+                    return MaybeScalar::try_from(scalar.to_bytes()).unwrap();
+
+                    #[cfg(not(feature = "secp256k1"))]
+                    return {
+                        let ct_opt = k256::NonZeroScalar::from_uint(scalar.into());
+                        match Option::<k256::NonZeroScalar>::from(ct_opt) {
+                            Some(inner) => MaybeScalar::from(inner),
+                            None => MaybeScalar::Zero,
+                        }
+                    };
+                }
+            }
+
+            impl From<Scalar> for k256::Scalar {
+                fn from(scalar: Scalar) -> Self {
+                    k256::NonZeroScalar::from(scalar).as_ref().clone()
+                }
+            }
+
+            impl From<MaybeScalar> for k256::Scalar {
+                fn from(maybe_scalar: MaybeScalar) -> Self {
+                    match maybe_scalar {
+                        MaybeScalar::Zero => k256::Scalar::ZERO,
+                        MaybeScalar::Valid(scalar) => k256::Scalar::from(scalar),
+                    }
+                }
+            }
         }
-    }
 
-    #[cfg(feature = "k256")]
-    impl From<k256::SecretKey> for Scalar {
-        fn from(seckey: k256::SecretKey) -> Self {
-            #[cfg(feature = "secp256k1")]
-            return Scalar::try_from(<[u8; 32]>::from(seckey.to_bytes())).unwrap();
+        mod secret_key {
+            use super::*;
 
-            #[cfg(not(feature = "secp256k1"))]
-            return Scalar {
-                inner: k256::NonZeroScalar::from(seckey),
-            };
+            impl From<k256::SecretKey> for Scalar {
+                fn from(seckey: k256::SecretKey) -> Self {
+                    Scalar::from(k256::NonZeroScalar::from(seckey))
+                }
+            }
+
+            impl From<k256::SecretKey> for MaybeScalar {
+                fn from(seckey: k256::SecretKey) -> Self {
+                    MaybeScalar::Valid(Scalar::from(seckey))
+                }
+            }
+
+            impl From<Scalar> for k256::SecretKey {
+                fn from(scalar: Scalar) -> Self {
+                    k256::SecretKey::from(k256::NonZeroScalar::from(scalar))
+                }
+            }
+
+            impl TryFrom<MaybeScalar> for k256::SecretKey {
+                type Error = ZeroScalarError;
+                fn try_from(maybe_scalar: MaybeScalar) -> Result<Self, Self::Error> {
+                    Ok(k256::SecretKey::from(maybe_scalar.not_zero()?))
+                }
+            }
         }
     }
 }
@@ -847,13 +991,7 @@ mod encodings {
         ///
         /// Fails if `bytes.len() != 32`.
         fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-            #[cfg(feature = "secp256k1")]
-            let inner = secp256k1::SecretKey::from_slice(bytes).map_err(|_| InvalidScalarBytes)?;
-
-            #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
-            let inner = k256::NonZeroScalar::try_from(bytes).map_err(|_| InvalidScalarBytes)?;
-
-            Ok(Scalar::from(inner))
+            Self::from_slice(bytes)
         }
     }
 
@@ -867,13 +1005,7 @@ mod encodings {
         /// Returns [`InvalidScalarBytes`] if the integer represented by the bytes
         /// is greater than or equal to the curve order, or if `bytes.len() != 32`.
         fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-            Scalar::try_from(bytes).map(Valid).or_else(|e| {
-                if bool::from(bytes.ct_eq(&[0; 32])) {
-                    Ok(MaybeScalar::Zero)
-                } else {
-                    Err(e)
-                }
-            })
+            Self::from_slice(bytes)
         }
     }
 
@@ -888,7 +1020,7 @@ mod encodings {
         /// Returns [`InvalidScalarBytes`] if the integer represented by the bytes
         /// is greater than or equal to the curve order.
         fn try_from(bytes: &[u8; 32]) -> Result<Self, Self::Error> {
-            Self::try_from(bytes as &[u8])
+            Self::from_slice(bytes as &[u8])
         }
     }
 
@@ -901,7 +1033,7 @@ mod encodings {
         /// Returns [`InvalidScalarBytes`] if the integer represented by the bytes
         /// is greater than or equal to the curve order, or if the bytes are all zero.
         fn try_from(bytes: &[u8; 32]) -> Result<Self, Self::Error> {
-            Self::try_from(bytes as &[u8])
+            Self::from_slice(bytes as &[u8])
         }
     }
 
@@ -914,7 +1046,7 @@ mod encodings {
         /// Returns [`InvalidScalarBytes`] if the integer represented by the bytes
         /// is greater than or equal to the curve order.
         fn try_from(bytes: [u8; 32]) -> Result<Self, Self::Error> {
-            Self::try_from(&bytes)
+            Self::from_slice(&bytes)
         }
     }
 
@@ -927,7 +1059,35 @@ mod encodings {
         /// Returns [`InvalidScalarBytes`] if the integer represented by the bytes
         /// is greater than or equal to the curve order, or if the bytes are all zero.
         fn try_from(bytes: [u8; 32]) -> Result<Self, Self::Error> {
-            Self::try_from(&bytes)
+            Self::from_slice(&bytes)
+        }
+    }
+
+    #[cfg(feature = "k256")]
+    impl TryFrom<k256::FieldBytes> for Scalar {
+        type Error = InvalidScalarBytes;
+
+        /// Attempts to parse a 32-byte array as a scalar in the range `[1, n)`
+        /// in constant time, where `n` is the curve order.
+        ///
+        /// Returns [`InvalidScalarBytes`] if the integer represented by the bytes
+        /// is greater than or equal to the curve order.
+        fn try_from(bytes: k256::FieldBytes) -> Result<Self, Self::Error> {
+            Self::from_slice(&bytes)
+        }
+    }
+
+    #[cfg(feature = "k256")]
+    impl TryFrom<k256::FieldBytes> for MaybeScalar {
+        type Error = InvalidScalarBytes;
+
+        /// Attempts to parse a 32-byte array as a scalar in the range `[0, n)`
+        /// in constant time, where `n` is the curve order.
+        ///
+        /// Returns [`InvalidScalarBytes`] if the integer represented by the bytes
+        /// is greater than or equal to the curve order.
+        fn try_from(bytes: k256::FieldBytes) -> Result<Self, Self::Error> {
+            Self::from_slice(&bytes)
         }
     }
 
@@ -1168,31 +1328,6 @@ where
 mod tests {
     use super::*;
 
-    impl From<u128> for Scalar {
-        fn from(value: u128) -> Self {
-            assert!(value > 0);
-            let mut arr = [0; 32];
-            arr[16..].clone_from_slice(&value.to_be_bytes());
-
-            #[cfg(feature = "secp256k1")]
-            let inner = secp256k1::SecretKey::from_slice(&arr).unwrap();
-
-            #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
-            let inner = k256::NonZeroScalar::from_repr(arr.into()).unwrap();
-
-            Scalar::from(inner)
-        }
-    }
-
-    impl From<u128> for MaybeScalar {
-        fn from(value: u128) -> Self {
-            if value == 0 {
-                return Zero;
-            }
-            Valid(Scalar::from(value))
-        }
-    }
-
     #[test]
     fn test_curve_order() {
         #[cfg(feature = "secp256k1")]
@@ -1305,7 +1440,7 @@ mod tests {
                 0, 0, 0, 29,
             ])
             .unwrap(),
-            Scalar::from(29),
+            scalar(29),
         );
         assert_eq!(
             Scalar::try_from([
@@ -1380,21 +1515,22 @@ mod tests {
         );
     }
 
+    fn scalar(n: u128) -> Scalar {
+        Scalar::try_from(n).unwrap()
+    }
+
     #[test]
     fn test_scalar_addition() {
         // test scalar addition
 
         // Scalar + Scalar
-        assert_eq!(Scalar::from(28) + Scalar::from(2), MaybeScalar::from(30));
+        assert_eq!(scalar(28) + scalar(2), MaybeScalar::from(30));
 
         // MaybeScalar + Scalar
-        assert_eq!(MaybeScalar::from(1) + Scalar::from(2), MaybeScalar::from(3));
+        assert_eq!(MaybeScalar::from(1) + scalar(2), MaybeScalar::from(3));
 
         // Scalar + MaybeScalar
-        assert_eq!(
-            Scalar::from(88) + MaybeScalar::from(12),
-            MaybeScalar::from(100)
-        );
+        assert_eq!(scalar(88) + MaybeScalar::from(12), MaybeScalar::from(100));
 
         // Scalar + MaybeScalar
         assert_eq!(
@@ -1403,7 +1539,7 @@ mod tests {
         );
 
         // Zero + Scalar
-        assert_eq!(MaybeScalar::Zero + Scalar::from(20), MaybeScalar::from(20));
+        assert_eq!(MaybeScalar::Zero + scalar(20), MaybeScalar::from(20));
 
         // Zero + MaybeScalar
         assert_eq!(
@@ -1412,7 +1548,7 @@ mod tests {
         );
 
         // Scalar + Zero
-        assert_eq!(Scalar::from(20) + MaybeScalar::Zero, MaybeScalar::from(20));
+        assert_eq!(scalar(20) + MaybeScalar::Zero, MaybeScalar::from(20));
 
         // MaybeScalar + Zero
         assert_eq!(
@@ -1432,37 +1568,25 @@ mod tests {
             MaybeScalar::max()
         );
         assert_eq!(
-            Scalar::try_from(curve_order_plus(-1)).unwrap() + Scalar::from(1),
+            Scalar::try_from(curve_order_plus(-1)).unwrap() + scalar(1),
             MaybeScalar::Zero
         );
         assert_eq!(
-            Scalar::try_from(curve_order_plus(-1)).unwrap() + Scalar::from(2),
+            Scalar::try_from(curve_order_plus(-1)).unwrap() + scalar(2),
             MaybeScalar::one()
         );
         assert_eq!(
-            Scalar::try_from(curve_order_plus(-1)).unwrap() + Scalar::from(3),
+            Scalar::try_from(curve_order_plus(-1)).unwrap() + scalar(3),
             MaybeScalar::two()
         );
     }
 
     #[test]
     fn test_scalar_negation() {
-        assert_eq!(
-            -Scalar::from(1),
-            Scalar::try_from(curve_order_plus(-1)).unwrap(),
-        );
-        assert_eq!(
-            -Scalar::from(2),
-            Scalar::try_from(curve_order_plus(-2)).unwrap(),
-        );
-        assert_eq!(
-            -Scalar::try_from(curve_order_plus(-1)).unwrap(),
-            Scalar::from(1),
-        );
-        assert_eq!(
-            -Scalar::try_from(curve_order_plus(-2)).unwrap(),
-            Scalar::from(2),
-        );
+        assert_eq!(-scalar(1), Scalar::try_from(curve_order_plus(-1)).unwrap(),);
+        assert_eq!(-scalar(2), Scalar::try_from(curve_order_plus(-2)).unwrap(),);
+        assert_eq!(-Scalar::try_from(curve_order_plus(-1)).unwrap(), scalar(1),);
+        assert_eq!(-Scalar::try_from(curve_order_plus(-2)).unwrap(), scalar(2),);
 
         assert_eq!(
             -MaybeScalar::try_from(curve_order_plus(-1)).unwrap(),
@@ -1479,35 +1603,29 @@ mod tests {
     #[test]
     fn test_scalar_subtraction() {
         // Scalar - Scalar
-        assert_eq!(Scalar::from(5) - Scalar::from(3), MaybeScalar::from(2));
+        assert_eq!(scalar(5) - scalar(3), MaybeScalar::from(2));
         assert_eq!(
-            Scalar::from(1) - Scalar::from(5),
+            scalar(1) - scalar(5),
             MaybeScalar::try_from(curve_order_plus(-4)).unwrap(),
         );
-        assert_eq!(Scalar::from(4) - Scalar::from(4), MaybeScalar::Zero);
+        assert_eq!(scalar(4) - scalar(4), MaybeScalar::Zero);
 
         // Scalar - MaybeScalar
+        assert_eq!(scalar(10) - MaybeScalar::from(3), MaybeScalar::from(7),);
         assert_eq!(
-            Scalar::from(10) - MaybeScalar::from(3),
-            MaybeScalar::from(7),
-        );
-        assert_eq!(
-            Scalar::from(3) - MaybeScalar::from(8),
+            scalar(3) - MaybeScalar::from(8),
             MaybeScalar::try_from(curve_order_plus(-5)).unwrap(),
         );
-        assert_eq!(Scalar::from(9) - MaybeScalar::from(9), MaybeScalar::Zero);
+        assert_eq!(scalar(9) - MaybeScalar::from(9), MaybeScalar::Zero);
 
         // MaybeScalar - Scalar
+        assert_eq!(MaybeScalar::from(13) - scalar(2), MaybeScalar::from(11),);
         assert_eq!(
-            MaybeScalar::from(13) - Scalar::from(2),
-            MaybeScalar::from(11),
-        );
-        assert_eq!(
-            MaybeScalar::from(4) - Scalar::from(9),
+            MaybeScalar::from(4) - scalar(9),
             MaybeScalar::try_from(curve_order_plus(-5)).unwrap(),
         );
         assert_eq!(
-            MaybeScalar::Zero - Scalar::from(5),
+            MaybeScalar::Zero - scalar(5),
             MaybeScalar::try_from(curve_order_plus(-5)).unwrap(),
         );
 
@@ -1529,28 +1647,25 @@ mod tests {
     #[test]
     fn test_scalar_multiplication() {
         // Scalar * Scalar
-        assert_eq!(Scalar::from(28) * Scalar::from(3), Scalar::from(84));
+        assert_eq!(scalar(28) * scalar(3), scalar(84));
 
         // Scalar * ONE
-        assert_eq!(Scalar::from(45) * Scalar::one(), Scalar::from(45));
+        assert_eq!(scalar(45) * Scalar::one(), scalar(45));
 
         // Scalar * MaybeScalar
-        assert_eq!(Scalar::from(45) * MaybeScalar::Zero, MaybeScalar::Zero);
+        assert_eq!(scalar(45) * MaybeScalar::Zero, MaybeScalar::Zero);
 
         // MaybeScalar * Scalar
-        assert_eq!(
-            MaybeScalar::from(3) * Scalar::from(25),
-            MaybeScalar::from(75)
-        );
+        assert_eq!(MaybeScalar::from(3) * scalar(25), MaybeScalar::from(75));
 
         // Zero * Scalar
-        assert_eq!(MaybeScalar::Zero * Scalar::from(45), MaybeScalar::Zero);
+        assert_eq!(MaybeScalar::Zero * scalar(45), MaybeScalar::Zero);
 
         // Zero * MaybeScalar
         assert_eq!(MaybeScalar::Zero * MaybeScalar::from(45), MaybeScalar::Zero);
 
         // Scalar * Zero
-        assert_eq!(Scalar::from(30) * MaybeScalar::Zero, MaybeScalar::Zero);
+        assert_eq!(scalar(30) * MaybeScalar::Zero, MaybeScalar::Zero);
 
         // MaybeScalar * Zero
         assert_eq!(MaybeScalar::from(30) * MaybeScalar::Zero, MaybeScalar::Zero);
@@ -1566,53 +1681,47 @@ mod tests {
     #[cfg(any(feature = "k256", feature = "secp256k1-invert"))]
     fn test_scalar_division() {
         // Scalar / Scalar
-        assert_eq!(Scalar::from(9) / Scalar::from(3), Scalar::from(3));
+        assert_eq!(scalar(9) / scalar(3), scalar(3));
         assert_eq!(Scalar::one() / Scalar::one(), Scalar::one());
-        assert_eq!(Scalar::from(2) / Scalar::one(), Scalar::from(2));
+        assert_eq!(scalar(2) / Scalar::one(), scalar(2));
         assert_eq!(Scalar::one() / Scalar::max(), Scalar::max());
 
         // t * t^-1 = 1
-        assert_eq!(
-            Scalar::from(3514) * (Scalar::one() / Scalar::from(3514)),
-            Scalar::one()
-        );
+        assert_eq!(scalar(3514) * (Scalar::one() / scalar(3514)), Scalar::one());
 
         // MaybeScalar / Scalar
-        assert_eq!(
-            MaybeScalar::from(10) / Scalar::from(2),
-            MaybeScalar::from(5)
-        );
-        assert_eq!(MaybeScalar::Zero / Scalar::from(3), MaybeScalar::Zero);
+        assert_eq!(MaybeScalar::from(10) / scalar(2), MaybeScalar::from(5));
+        assert_eq!(MaybeScalar::Zero / scalar(3), MaybeScalar::Zero);
     }
 
     #[test]
     fn test_scalar_assign_ops() {
         // (20 + 2 + 1) * 3 - 5 = 64
-        let mut scalar = MaybeScalar::Valid(Scalar::from(20));
-        scalar += Scalar::two();
-        scalar += Scalar::one();
-        scalar *= Scalar::from(3);
-        scalar -= Scalar::from(5);
-        assert_eq!(scalar, MaybeScalar::Valid(Scalar::from(64)));
+        let mut n = MaybeScalar::from(20);
+        n += Scalar::two();
+        n += Scalar::one();
+        n *= scalar(3);
+        n -= scalar(5);
+        assert_eq!(n, MaybeScalar::from(64));
 
         // (20 + 2 + 1) * 3 - 5 = 64
-        let mut scalar = MaybeScalar::Valid(Scalar::from(20));
-        scalar += MaybeScalar::two();
-        scalar += MaybeScalar::one();
-        scalar *= MaybeScalar::Valid(Scalar::from(3));
-        scalar -= MaybeScalar::Valid(Scalar::from(5));
-        assert_eq!(scalar, MaybeScalar::Valid(Scalar::from(64)));
+        let mut n = MaybeScalar::from(20);
+        n += MaybeScalar::two();
+        n += MaybeScalar::one();
+        n *= MaybeScalar::Valid(scalar(3));
+        n -= MaybeScalar::Valid(scalar(5));
+        assert_eq!(n, MaybeScalar::from(64));
 
         // 20 * 5 = 100
-        let mut scalar = Scalar::from(20);
-        scalar *= Scalar::from(5);
-        assert_eq!(scalar, Scalar::from(100));
+        let mut n = scalar(20);
+        n *= scalar(5);
+        assert_eq!(n, scalar(100));
 
         #[cfg(any(feature = "k256", feature = "secp256k1-invert"))]
         {
             // 100 / 5 = 20
-            scalar /= Scalar::from(5);
-            assert_eq!(scalar, Scalar::from(20));
+            n /= scalar(5);
+            assert_eq!(n, scalar(20));
         }
     }
 

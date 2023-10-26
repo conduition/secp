@@ -356,98 +356,6 @@ impl Point {
     }
 }
 
-mod as_ref_conversions {
-    use super::*;
-
-    #[cfg(feature = "secp256k1")]
-    impl AsRef<secp256k1::PublicKey> for Point {
-        fn as_ref(&self) -> &secp256k1::PublicKey {
-            &self.inner
-        }
-    }
-
-    #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
-    impl AsRef<k256::PublicKey> for Point {
-        fn as_ref(&self) -> &k256::PublicKey {
-            &self.inner
-        }
-    }
-}
-
-mod non_identity_conversions {
-    use super::*;
-
-    #[cfg(feature = "secp256k1")]
-    impl From<Point> for secp256k1::PublicKey {
-        fn from(point: Point) -> Self {
-            point.inner
-        }
-    }
-
-    #[cfg(feature = "secp256k1")]
-    impl From<Point> for secp256k1::XOnlyPublicKey {
-        fn from(point: Point) -> Self {
-            let (x, _) = point.inner.x_only_public_key();
-            x
-        }
-    }
-
-    #[cfg(feature = "secp256k1")]
-    impl From<(secp256k1::XOnlyPublicKey, secp256k1::Parity)> for Point {
-        /// Converts an X-only public key with a given parity into a [`Point`].
-        fn from((xonly, parity): (secp256k1::XOnlyPublicKey, secp256k1::Parity)) -> Self {
-            let pk = secp256k1::PublicKey::from_x_only_public_key(xonly, parity);
-            Point::from(pk)
-        }
-    }
-
-    #[cfg(feature = "k256")]
-    impl From<Point> for k256::PublicKey {
-        fn from(point: Point) -> Self {
-            #[cfg(feature = "secp256k1")]
-            return k256::PublicKey::from_sec1_bytes(&point.serialize()).unwrap();
-
-            #[cfg(not(feature = "secp256k1"))]
-            return point.inner;
-        }
-    }
-}
-
-/// Need to implement this manually because [`k256::PublicKey`] does not implement `Hash`.
-impl std::hash::Hash for Point {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.serialize().hash(state);
-    }
-}
-
-impl std::fmt::Debug for Point {
-    /// Formats the point into a string like `"Point(025fa83ed...)"`.
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Point({:x})", self)
-    }
-}
-
-#[cfg(all(feature = "k256", not(feature = "secp256k1")))]
-mod pubkey_ord {
-    use super::*;
-
-    impl Ord for Point {
-        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            // The `k256` crate implements `Ord` based on uncompressed encoding.
-            // To match BIP327, we must sort keys based on their compressed encoding.
-            self.inner
-                .to_encoded_point(true)
-                .cmp(&other.inner.to_encoded_point(true))
-        }
-    }
-
-    impl PartialOrd for Point {
-        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            Some(self.cmp(other))
-        }
-    }
-}
-
 /// This type is effectively the same as [`Point`], except it can also
 /// represent the point at infinity, exposed as [`MaybePoint::Infinity`].
 /// This is the special 'zero-point', or 'identity element' on the curve
@@ -638,82 +546,305 @@ impl MaybePoint {
     }
 }
 
-impl Default for MaybePoint {
-    /// Returns the point at infinity, which acts as an
-    /// identity element in the additive curve group.
-    fn default() -> Self {
-        MaybePoint::Infinity
+mod std_traits {
+    use super::*;
+
+    /// Need to implement this manually because [`k256::PublicKey`] does not implement `Hash`.
+    impl std::hash::Hash for Point {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            self.serialize().hash(state);
+        }
+    }
+
+    impl std::fmt::Debug for Point {
+        /// Formats the point into a string like `"Point(025fa83ed...)"`.
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "Point({:x})", self)
+        }
+    }
+
+    impl Default for MaybePoint {
+        /// Returns the point at infinity, which acts as an
+        /// identity element in the additive curve group.
+        fn default() -> Self {
+            MaybePoint::Infinity
+        }
+    }
+
+    #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
+    mod pubkey_ord {
+        use super::*;
+
+        impl Ord for Point {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                // The `k256` crate implements `Ord` based on uncompressed encoding.
+                // To match BIP327, we must sort keys based on their compressed encoding.
+                self.inner
+                    .to_encoded_point(true)
+                    .cmp(&other.inner.to_encoded_point(true))
+            }
+        }
+
+        impl PartialOrd for Point {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                Some(self.cmp(other))
+            }
+        }
     }
 }
 
 mod conversions {
     use super::*;
 
-    impl From<Point> for MaybePoint {
-        fn from(point: Point) -> Self {
-            MaybePoint::Valid(point)
+    mod as_ref_conversions {
+        use super::*;
+
+        #[cfg(feature = "secp256k1")]
+        impl AsRef<secp256k1::PublicKey> for Point {
+            fn as_ref(&self) -> &secp256k1::PublicKey {
+                &self.inner
+            }
         }
-    }
 
-    #[cfg(feature = "secp256k1")]
-    impl From<secp256k1::PublicKey> for Point {
-        fn from(value: secp256k1::PublicKey) -> Self {
-            Point { inner: value }
-        }
-    }
-
-    #[cfg(feature = "secp256k1")]
-    impl From<secp256k1::PublicKey> for MaybePoint {
-        fn from(pubkey: secp256k1::PublicKey) -> Self {
-            MaybePoint::Valid(Point::from(pubkey))
-        }
-    }
-
-    #[cfg(feature = "k256")]
-    impl From<k256::PublicKey> for Point {
-        fn from(pubkey: k256::PublicKey) -> Self {
-            #[cfg(feature = "secp256k1")]
-            let inner = {
-                let encoded_point = pubkey.to_encoded_point(false);
-                secp256k1::PublicKey::from_slice(encoded_point.as_bytes()).unwrap()
-            };
-
-            #[cfg(not(feature = "secp256k1"))]
-            let inner = pubkey;
-
-            Point { inner }
-        }
-    }
-
-    #[cfg(feature = "k256")]
-    impl From<k256::PublicKey> for MaybePoint {
-        fn from(pubkey: k256::PublicKey) -> Self {
-            MaybePoint::Valid(Point::from(pubkey))
-        }
-    }
-
-    impl From<MaybePoint> for Option<Point> {
-        /// Converts the `MaybePoint` into an `Option`, returning `None` if
-        /// `maybe_point == MaybePoint::Infinity` or `Some(p)` if
-        /// `maybe_point == MaybePoint::Valid(p)`.
-        fn from(maybe_point: MaybePoint) -> Self {
-            match maybe_point {
-                Valid(point) => Some(point),
-                Infinity => None,
+        #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
+        impl AsRef<k256::PublicKey> for Point {
+            fn as_ref(&self) -> &k256::PublicKey {
+                &self.inner
             }
         }
     }
 
-    impl TryFrom<MaybePoint> for Point {
-        type Error = InfinityPointError;
+    mod internal_conversions {
+        use super::*;
 
-        /// Converts the `MaybePoint` into a `Result<Point, InfinityPointError>`,
-        /// returning `Ok(Point)` if the point is a valid non-infinity point,
-        /// or `Err(InfinityPointError)` if `maybe_point == MaybePoint::Infinity`.
-        fn try_from(maybe_point: MaybePoint) -> Result<Self, Self::Error> {
-            match maybe_point {
-                Valid(point) => Ok(point),
-                Infinity => Err(InfinityPointError),
+        impl From<MaybePoint> for Option<Point> {
+            /// Converts the `MaybePoint` into an `Option`, returning `None` if
+            /// `maybe_point == MaybePoint::Infinity` or `Some(p)` if
+            /// `maybe_point == MaybePoint::Valid(p)`.
+            fn from(maybe_point: MaybePoint) -> Self {
+                match maybe_point {
+                    Valid(point) => Some(point),
+                    Infinity => None,
+                }
+            }
+        }
+
+        impl From<Point> for MaybePoint {
+            /// Converts the point into a [`MaybePoint::Valid`] instance.
+            fn from(point: Point) -> MaybePoint {
+                MaybePoint::Valid(point)
+            }
+        }
+
+        impl TryFrom<MaybePoint> for Point {
+            type Error = InfinityPointError;
+
+            /// Converts the `MaybePoint` into a `Result<Point, InfinityPointError>`,
+            /// returning `Ok(Point)` if the point is a valid non-infinity point,
+            /// or `Err(InfinityPointError)` if `maybe_point == MaybePoint::Infinity`.
+            fn try_from(maybe_point: MaybePoint) -> Result<Self, Self::Error> {
+                match maybe_point {
+                    Valid(point) => Ok(point),
+                    Infinity => Err(InfinityPointError),
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "secp256k1")]
+    mod secp256k1_conversions {
+        use super::*;
+
+        mod public_key {
+            use super::*;
+
+            impl From<secp256k1::PublicKey> for Point {
+                fn from(pubkey: secp256k1::PublicKey) -> Self {
+                    Point { inner: pubkey }
+                }
+            }
+
+            impl From<secp256k1::PublicKey> for MaybePoint {
+                fn from(pubkey: secp256k1::PublicKey) -> Self {
+                    MaybePoint::Valid(Point::from(pubkey))
+                }
+            }
+
+            impl From<Point> for secp256k1::PublicKey {
+                fn from(point: Point) -> Self {
+                    point.inner
+                }
+            }
+
+            impl TryFrom<MaybePoint> for secp256k1::PublicKey {
+                type Error = InfinityPointError;
+                fn try_from(maybe_point: MaybePoint) -> Result<Self, Self::Error> {
+                    Ok(maybe_point.not_inf()?.inner)
+                }
+            }
+        }
+
+        mod xonly_public_key {
+            use super::*;
+
+            type KeyAndParity = (secp256k1::XOnlyPublicKey, secp256k1::Parity);
+
+            impl From<KeyAndParity> for Point {
+                /// Converts an X-only public key with a given parity into a [`Point`].
+                fn from((xonly, parity): KeyAndParity) -> Self {
+                    let pk = secp256k1::PublicKey::from_x_only_public_key(xonly, parity);
+                    Point::from(pk)
+                }
+            }
+
+            impl From<KeyAndParity> for MaybePoint {
+                fn from((xonly, parity): KeyAndParity) -> Self {
+                    MaybePoint::Valid(Point::from((xonly, parity)))
+                }
+            }
+
+            impl From<Point> for KeyAndParity {
+                fn from(point: Point) -> Self {
+                    point.inner.x_only_public_key()
+                }
+            }
+
+            impl TryFrom<MaybePoint> for KeyAndParity {
+                type Error = InfinityPointError;
+                fn try_from(maybe_point: MaybePoint) -> Result<Self, Self::Error> {
+                    Ok(KeyAndParity::from(maybe_point.not_inf()?))
+                }
+            }
+
+            impl From<Point> for secp256k1::XOnlyPublicKey {
+                fn from(point: Point) -> Self {
+                    let (x, _) = point.inner.x_only_public_key();
+                    x
+                }
+            }
+
+            impl TryFrom<MaybePoint> for secp256k1::XOnlyPublicKey {
+                type Error = InfinityPointError;
+                fn try_from(maybe_point: MaybePoint) -> Result<Self, Self::Error> {
+                    Ok(secp256k1::XOnlyPublicKey::from(maybe_point.not_inf()?))
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "k256")]
+    mod k256_conversions {
+        use super::*;
+
+        mod public_key {
+            use super::*;
+
+            impl From<k256::PublicKey> for Point {
+                fn from(pubkey: k256::PublicKey) -> Self {
+                    #[cfg(feature = "secp256k1")]
+                    let inner = {
+                        let encoded_point = pubkey.to_encoded_point(false);
+                        secp256k1::PublicKey::from_slice(encoded_point.as_bytes()).unwrap()
+                    };
+
+                    #[cfg(not(feature = "secp256k1"))]
+                    let inner = pubkey;
+
+                    Point { inner }
+                }
+            }
+
+            impl From<k256::PublicKey> for MaybePoint {
+                fn from(pubkey: k256::PublicKey) -> Self {
+                    MaybePoint::Valid(Point::from(pubkey))
+                }
+            }
+
+            impl From<Point> for k256::PublicKey {
+                fn from(point: Point) -> Self {
+                    #[cfg(feature = "secp256k1")]
+                    return k256::PublicKey::from_sec1_bytes(&point.serialize()).unwrap();
+
+                    #[cfg(not(feature = "secp256k1"))]
+                    return point.inner;
+                }
+            }
+
+            impl TryFrom<MaybePoint> for k256::PublicKey {
+                type Error = InfinityPointError;
+
+                fn try_from(maybe_point: MaybePoint) -> Result<Self, Self::Error> {
+                    Ok(k256::PublicKey::from(maybe_point.not_inf()?))
+                }
+            }
+        }
+
+        mod encoded_point {
+            use super::*;
+
+            impl TryFrom<k256::EncodedPoint> for Point {
+                type Error = InvalidPointBytes;
+                fn try_from(encoded_point: k256::EncodedPoint) -> Result<Self, Self::Error> {
+                    Self::from_slice(encoded_point.as_bytes())
+                }
+            }
+
+            impl TryFrom<k256::EncodedPoint> for MaybePoint {
+                type Error = InvalidPointBytes;
+                fn try_from(encoded_point: k256::EncodedPoint) -> Result<Self, Self::Error> {
+                    Self::from_slice(encoded_point.as_bytes())
+                }
+            }
+
+            impl From<Point> for k256::EncodedPoint {
+                fn from(point: Point) -> Self {
+                    k256::EncodedPoint::from(MaybePoint::Valid(point))
+                }
+            }
+
+            impl From<MaybePoint> for k256::EncodedPoint {
+                fn from(maybe_point: MaybePoint) -> Self {
+                    let uncompressed = maybe_point.serialize_uncompressed();
+                    k256::EncodedPoint::from_bytes(&uncompressed[1..]).unwrap()
+                }
+            }
+        }
+
+        mod affine_point {
+            use super::*;
+
+            impl TryFrom<k256::AffinePoint> for Point {
+                type Error = InfinityPointError;
+                fn try_from(affine_point: k256::AffinePoint) -> Result<Self, Self::Error> {
+                    MaybePoint::from(affine_point).not_inf()
+                }
+            }
+
+            impl From<k256::AffinePoint> for MaybePoint {
+                fn from(affine_point: k256::AffinePoint) -> Self {
+                    #[cfg(feature = "secp256k1")]
+                    return MaybePoint::try_from(affine_point.to_encoded_point(false)).unwrap();
+
+                    #[cfg(not(feature = "secp256k1"))]
+                    return Point::try_from(affine_point)
+                        .map(MaybePoint::Valid)
+                        .unwrap_or(MaybePoint::Infinity);
+                }
+            }
+
+            impl From<Point> for k256::AffinePoint {
+                fn from(point: Point) -> Self {
+                    return k256::AffinePoint::from(k256::PublicKey::from(point));
+                }
+            }
+
+            impl From<MaybePoint> for k256::AffinePoint {
+                fn from(point: MaybePoint) -> Self {
+                    match point {
+                        MaybePoint::Infinity => k256::AffinePoint::IDENTITY,
+                        MaybePoint::Valid(point) => k256::AffinePoint::from(point),
+                    }
+                }
             }
         }
     }
@@ -1220,7 +1351,7 @@ mod tests {
             "02c1a4892280e30af2e43c7db3d60c3b9c5c413a4ad9dc67fac2d0a2fbf378f451"
                 .parse::<Point>()
                 .unwrap()
-                * Scalar::from(1),
+                * Scalar::one(),
             "02c1a4892280e30af2e43c7db3d60c3b9c5c413a4ad9dc67fac2d0a2fbf378f451"
                 .parse::<Point>()
                 .unwrap()
@@ -1228,7 +1359,7 @@ mod tests {
 
         // `Scalar` * `Point`
         assert_eq!(
-            Scalar::from(1)
+            Scalar::one()
                 * "02c1a4892280e30af2e43c7db3d60c3b9c5c413a4ad9dc67fac2d0a2fbf378f451"
                     .parse::<Point>()
                     .unwrap(),
@@ -1359,7 +1490,7 @@ mod tests {
         // MaybePoint / Scalar
         assert_eq!(MaybePoint::Valid(salted) / k, MaybePoint::Valid(unblinded));
         assert_eq!(
-            MaybePoint::Infinity / Scalar::from(40),
+            MaybePoint::Infinity / Scalar::try_from(40).unwrap(),
             MaybePoint::Infinity
         );
     }
