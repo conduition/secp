@@ -1,4 +1,4 @@
-use super::{MaybePoint, MaybeScalar, Point, Scalar};
+use super::{MaybePoint, MaybeScalar, Point, Scalar, G};
 
 #[cfg(feature = "secp256k1")]
 use super::LIBSECP256K1_CTX;
@@ -27,6 +27,11 @@ impl Optional<Point> for Point {
 impl Optional<Point> for MaybePoint {
     fn option(self) -> Option<Point> {
         self.into_option()
+    }
+}
+impl Optional<Point> for G {
+    fn option(self) -> Option<Point> {
+        Some(Point::generator())
     }
 }
 
@@ -154,6 +159,34 @@ mod inner_operator_impl {
     }
 }
 
+mod generator_ops {
+    use super::*;
+
+    /// `Scalar` * `G`
+    impl std::ops::Mul<G> for Scalar {
+        type Output = Point;
+        fn mul(self, _: G) -> Self::Output {
+            self.base_point_mul()
+        }
+    }
+
+    /// `G` * `Scalar`
+    impl std::ops::Mul<Scalar> for G {
+        type Output = Point;
+        fn mul(self, scalar: Scalar) -> Self::Output {
+            scalar.base_point_mul()
+        }
+    }
+
+    /// `-G`
+    impl std::ops::Neg for G {
+        type Output = Point;
+        fn neg(self) -> Self::Output {
+            -Point::generator()
+        }
+    }
+}
+
 /// Adds any two types together. These could be `Point`, `Scalar`, or the
 /// maybe-versions of each - as long as their shared inner type `I` is additive.
 /// The output type T3 is always either `MaybePoint` or `MaybeScalar` because
@@ -178,10 +211,10 @@ where
 }
 
 /// Simply addition with the right-hand-side negated.
-fn subtract_any<T1, T2, T3>(a: T1, b: T2) -> T3
+fn subtract_any<T1, T2, N2, T3>(a: T1, b: T2) -> T3
 where
-    T1: std::ops::Add<T2, Output = T3>,
-    T2: std::ops::Neg<Output = T2>,
+    T1: std::ops::Add<N2, Output = T3>,
+    T2: std::ops::Neg<Output = N2>,
 {
     a + (-b)
 }
@@ -263,6 +296,11 @@ implement_binary_ops!(
     Point + MaybePoint -> MaybePoint;
     MaybePoint + Point -> MaybePoint;
     MaybePoint + MaybePoint -> MaybePoint;
+
+    Point + G -> MaybePoint;
+    MaybePoint + G -> MaybePoint;
+    G + Point -> MaybePoint;
+    G + MaybePoint -> MaybePoint;
 );
 
 implement_binary_ops!(
@@ -277,6 +315,11 @@ implement_binary_ops!(
     Point - MaybePoint -> MaybePoint;
     MaybePoint - Point -> MaybePoint;
     MaybePoint - MaybePoint -> MaybePoint;
+
+    Point - G -> MaybePoint;
+    MaybePoint - G -> MaybePoint;
+    G - Point -> MaybePoint;
+    G - MaybePoint -> MaybePoint;
 );
 
 implement_binary_ops!(
@@ -293,6 +336,9 @@ implement_binary_ops!(
     MaybeScalar * Point -> MaybePoint;
     Scalar * MaybePoint -> MaybePoint;
     MaybeScalar * MaybePoint -> MaybePoint;
+
+    MaybeScalar * G -> MaybePoint;
+    G * MaybeScalar -> MaybePoint;
 );
 
 implement_assign_ops!(
@@ -303,6 +349,7 @@ implement_assign_ops!(
 
     MaybePoint + Point;
     MaybePoint + MaybePoint;
+    MaybePoint + G;
 
     // Cannot `AddAssign` to `Scalar` or `Point`,
     // because addition can always result in a zero result.
@@ -315,6 +362,7 @@ implement_assign_ops!(
 
     MaybePoint - Point;
     MaybePoint - MaybePoint;
+    MaybePoint - G;
 
     // Cannot `SubAssign` to `Scalar` or `Point`,
     // because addition can always result in a zero result.
@@ -340,8 +388,8 @@ mod division {
     /// is algebraically the same as `1 / rhs`.
     impl std::ops::Div<Scalar> for Scalar {
         type Output = Scalar;
-        fn div(self, other: Scalar) -> Self::Output {
-            self * other.invert()
+        fn div(self, rhs: Scalar) -> Self::Output {
+            self * rhs.invert()
         }
     }
 
@@ -349,8 +397,17 @@ mod division {
     /// is algebraically the same as `1 / rhs`.
     impl std::ops::Div<Scalar> for Point {
         type Output = Point;
-        fn div(self, other: Scalar) -> Self::Output {
-            self * other.invert()
+        fn div(self, rhs: Scalar) -> Self::Output {
+            self * rhs.invert()
+        }
+    }
+
+    /// To divide by `rhs`, we simply multiply by `rhs.inverse()`, because `rhs.inverse()`
+    /// is algebraically the same as `1 / rhs`.
+    impl std::ops::Div<Scalar> for G {
+        type Output = Point;
+        fn div(self, rhs: Scalar) -> Self::Output {
+            self * rhs.invert()
         }
     }
 

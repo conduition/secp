@@ -29,6 +29,42 @@ const GENERATOR_POINT_BYTES: [u8; 65] = [
 static GENERATOR_POINT: Lazy<Point> =
     Lazy::new(|| Point::try_from(&GENERATOR_POINT_BYTES).unwrap());
 
+/// This struct type represents the secp256k1 generator point, and can be
+/// used for scalar-point multiplication.
+///
+/// ```
+/// use secp::{G, Scalar};
+///
+/// let privkey = Scalar::try_from([0xAB; 32]).unwrap();
+/// assert_eq!(privkey * G, privkey.base_point_mul());
+/// ```
+///
+/// `G` dereferences as [`Point`], allowing reuse of `Point` methods and traits.
+///
+/// ```
+/// # use secp::G;
+/// assert!(G.has_even_y());
+/// assert_eq!(
+///     G.serialize_uncompressed(),
+///     [
+///         0x04, 0x79, 0xbe, 0x66, 0x7e, 0xf9, 0xdc, 0xbb, 0xac, 0x55, 0xa0, 0x62, 0x95, 0xce,
+///         0x87, 0x0b, 0x07, 0x02, 0x9b, 0xfc, 0xdb, 0x2d, 0xce, 0x28, 0xd9, 0x59, 0xf2, 0x81,
+///         0x5b, 0x16, 0xf8, 0x17, 0x98, 0x48, 0x3a, 0xda, 0x77, 0x26, 0xa3, 0xc4, 0x65, 0x5d,
+///         0xa4, 0xfb, 0xfc, 0x0e, 0x11, 0x08, 0xa8, 0xfd, 0x17, 0xb4, 0x48, 0xa6, 0x85, 0x54,
+///         0x19, 0x9c, 0x47, 0xd0, 0x8f, 0xfb, 0x10, 0xd4, 0xb8,
+///     ]
+/// );
+/// ```
+#[derive(Debug, Default)]
+pub struct G;
+
+impl std::ops::Deref for G {
+    type Target = Point;
+    fn deref(&self) -> &Self::Target {
+        &GENERATOR_POINT
+    }
+}
+
 /// Represents a valid non-infinity point on the secp256k1 curve.
 /// Internally this wraps either [`secp256k1::PublicKey`] or [`k256::PublicKey`]
 /// depending on which feature set is enabled.
