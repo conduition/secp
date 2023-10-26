@@ -162,6 +162,14 @@ mod inner_operator_impl {
 mod generator_ops {
     use super::*;
 
+    /// `G` + `G`s
+    impl std::ops::Add<G> for G {
+        type Output = Point;
+        fn add(self, _: G) -> Self::Output {
+            Scalar::two().base_point_mul()
+        }
+    }
+
     /// `Scalar` * `G`
     impl std::ops::Mul<G> for Scalar {
         type Output = Point;
@@ -316,6 +324,7 @@ implement_binary_ops!(
     MaybePoint - Point -> MaybePoint;
     MaybePoint - MaybePoint -> MaybePoint;
 
+    G - G -> MaybePoint;
     Point - G -> MaybePoint;
     MaybePoint - G -> MaybePoint;
     G - Point -> MaybePoint;

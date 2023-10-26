@@ -1160,6 +1160,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    #![allow(non_snake_case)]
     use super::*;
     use crate::{MaybeScalar, Scalar};
 
@@ -1294,50 +1295,50 @@ mod tests {
         ];
 
         for (p1_str, p2_str, sum_str) in point_hex_fixtures {
-            let p1: MaybePoint = p1_str
+            let P1: MaybePoint = p1_str
                 .parse()
-                .expect(&format!("failed to parse p1 fixture point {}", p1_str));
-            let p2: MaybePoint = p2_str
+                .expect(&format!("failed to parse P1 fixture point {}", p1_str));
+            let P2: MaybePoint = p2_str
                 .parse()
-                .expect(&format!("failed to parse p2 fixture point {}", p2_str));
+                .expect(&format!("failed to parse P2 fixture point {}", p2_str));
             let sum: MaybePoint = sum_str
                 .parse()
                 .expect(&format!("failed to parse sum fixture point {}", sum_str));
 
-            assert_eq!(p1 + p2, sum, "\n{} \n+ {} \n= {}", p1, p2, sum);
-            assert_eq!(sum - p1, p2, "\n{} \n- {} \n= {}", sum, p1, p2);
-            assert_eq!(sum - p2, p1, "\n{} \n- {} \n= {}", sum, p2, p1);
-            assert_eq!(p2 - sum, -p1, "\n{} \n- {} \n= -{}", p2, sum, p1);
-            assert_eq!(p1 - sum, -p2, "\n{} \n- {} \n= -{}", p1, sum, p2);
+            assert_eq!(P1 + P2, sum, "\n{} \n+ {} \n= {}", P1, P2, sum);
+            assert_eq!(sum - P1, P2, "\n{} \n- {} \n= {}", sum, P1, P2);
+            assert_eq!(sum - P2, P1, "\n{} \n- {} \n= {}", sum, P2, P1);
+            assert_eq!(P2 - sum, -P1, "\n{} \n- {} \n= -{}", P2, sum, P1);
+            assert_eq!(P1 - sum, -P2, "\n{} \n- {} \n= -{}", P1, sum, P2);
 
-            match p1 {
-                Valid(p1_valid) => match p2 {
+            match P1 {
+                Valid(p1_valid) => match P2 {
                     Valid(p2_valid) => {
                         assert_eq!(p1_valid + p2_valid, sum); // `Point` + `Point`
                         assert_eq!(p2_valid + p1_valid, sum); // `Point` + `Point`
-                        assert_eq!(sum - p1_valid, p2); // `MaybePoint` - `Point`
-                        assert_eq!(sum - p2_valid, p1); // `MaybePoint` - `Point`
+                        assert_eq!(sum - p1_valid, P2); // `MaybePoint` - `Point`
+                        assert_eq!(sum - p2_valid, P1); // `MaybePoint` - `Point`
                         assert_eq!(p1_valid - p1_valid, Infinity); // `Point` - `Point`
                         assert_eq!(p2_valid - p2_valid, Infinity); // `Point` - `Point`
                     }
                     Infinity => {
-                        assert_eq!(p1 + p2, p1);
-                        assert_eq!(p2 + p1, p1);
+                        assert_eq!(P1 + P2, P1);
+                        assert_eq!(P2 + P1, P1);
                     }
                 },
-                Infinity => match p2 {
+                Infinity => match P2 {
                     Valid(p2_valid) => {
-                        assert_eq!(p1 + p2_valid, p2); // `Infinity` + `Point`
-                        assert_eq!(p2_valid + p1, p2); // `Point` + `Infinity`
-                        assert_eq!(p1 - p2_valid, -p2); // `Infinity` - `Point`
-                        assert_eq!(p2_valid - p1, p2); // `Point` - `Infinity`
+                        assert_eq!(P1 + p2_valid, P2); // `Infinity` + `Point`
+                        assert_eq!(p2_valid + P1, P2); // `Point` + `Infinity`
+                        assert_eq!(P1 - p2_valid, -P2); // `Infinity` - `Point`
+                        assert_eq!(p2_valid - P1, P2); // `Point` - `Infinity`
                         assert_eq!(p2_valid - p2_valid, Infinity); // `Point` - `Point`
                     }
                     Infinity => {
-                        assert_eq!(p1 + p2, Infinity); // `Infinity` + `Infinity`
-                        assert_eq!(p1 - p2, Infinity); // `Infinity` - `Infinity`
-                        assert_eq!(-p1, Infinity); // -`Infinity`
-                        assert_eq!(-p2, Infinity); // -`Infinity`
+                        assert_eq!(P1 + P2, Infinity); // `Infinity` + `Infinity`
+                        assert_eq!(P1 - P2, Infinity); // `Infinity` - `Infinity`
+                        assert_eq!(-P1, Infinity); // -`Infinity`
+                        assert_eq!(-P2, Infinity); // -`Infinity`
                     }
                 },
             };
@@ -1506,18 +1507,18 @@ mod tests {
             .unwrap();
 
         // `Point` *= `Scalar`
-        let mut p1 = Point::generator();
-        p1 *= scalar;
-        assert_eq!(p1, pub_point);
+        let mut P1 = Point::generator();
+        P1 *= scalar;
+        assert_eq!(P1, pub_point);
 
         // `MaybePoint` *= `Scalar`
-        let mut p2 = Valid(Point::generator());
-        p2 *= scalar;
-        assert_eq!(p2, Valid(pub_point));
+        let mut P2 = Valid(Point::generator());
+        P2 *= scalar;
+        assert_eq!(P2, Valid(pub_point));
 
         // `MaybePoint` *= `MaybeScalar`
-        let mut p2 = Valid(Point::generator());
-        p2 *= MaybeScalar::Valid(scalar);
-        assert_eq!(p2, Valid(pub_point));
+        let mut P2 = Valid(Point::generator());
+        P2 *= MaybeScalar::Valid(scalar);
+        assert_eq!(P2, Valid(pub_point));
     }
 }
