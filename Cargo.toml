@@ -6,7 +6,7 @@ authors = ["conduition <conduition@proton.me>"]
 description = "A flexible and secure secp256k1 elliptic curve math library with constant-time support and superb ergonomics."
 readme = "README.md"
 license = "Unlicense"
-repository = "https://github.com/conduition/cardseed"
+repository = "https://github.com/conduition/secp"
 keywords = ["secp256k1", "k256", "elliptic", "curve", "schnorr"]
 
 [dependencies]
