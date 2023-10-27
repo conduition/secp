@@ -864,9 +864,27 @@ mod encodings {
             f.write_str(encoded)
         }
     }
+    impl std::fmt::UpperHex for Point {
+        /// Formats the Point as a DER-compressed hex string in upper case.
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            let mut buffer = [0; 66];
+            let encoded = base16ct::upper::encode_str(&self.serialize(), &mut buffer).unwrap();
+            f.write_str(encoded)
+        }
+    }
 
     impl std::fmt::LowerHex for MaybePoint {
         /// Formats the Point as a DER-compressed hex string in lower case.
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            match self {
+                Valid(point) => point.fmt(f),
+                Infinity => f.write_str(POINT_INFINITY_STR),
+            }
+        }
+    }
+
+    impl std::fmt::UpperHex for MaybePoint {
+        /// Formats the Point as a DER-compressed hex string in upper case.
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
             match self {
                 Valid(point) => point.fmt(f),

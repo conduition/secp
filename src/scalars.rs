@@ -918,6 +918,19 @@ mod encodings {
         }
     }
 
+    impl std::fmt::UpperHex for Scalar {
+        /// Formats the scalar as a hex string in upper case.
+        ///
+        /// # Warning
+        ///
+        /// This method may expose private data if the scalar represents a secret key.
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            let mut buffer = [0; 64];
+            let encoded = base16ct::upper::encode_str(&self.serialize(), &mut buffer).unwrap();
+            f.write_str(encoded)
+        }
+    }
+
     impl std::fmt::LowerHex for MaybeScalar {
         /// Formats the scalar as a hex string in lower case.
         ///
@@ -932,21 +945,15 @@ mod encodings {
         }
     }
 
-    #[cfg(feature = "scalar-display")]
-    impl std::fmt::Display for Scalar {
-        /// Formats a scalar into a 32-byte hex string representation.
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            write!(f, "{:x}", self)
-        }
-    }
-
-    #[cfg(feature = "scalar-display")]
-    impl std::fmt::Display for MaybeScalar {
-        /// Formats a scalar into a 32-byte hex string representation.
-        /// Prints 64 zero characters if `self == MaybeScalar::Zero`.
+    impl std::fmt::UpperHex for MaybeScalar {
+        /// Formats the scalar as a hex string in upper case.
+        ///
+        /// # Warning
+        ///
+        /// This method may expose private data if the scalar represents a secret key.
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
             match self {
-                Valid(ref scalar) => write!(f, "{:x}", scalar),
+                Valid(scalar) => scalar.fmt(f),
                 Zero => f.write_str(SCALAR_ZERO_STR),
             }
         }
