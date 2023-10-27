@@ -1,12 +1,12 @@
 .PHONY: check check-* test test-*
-check: check-secp256k1 check-k256 check-all-features check-default check-mixed
+check: check-default check-mixed check-secp256k1 check-k256
 
 # Checks the source code with default features enabled.
 check-default:
 	cargo check
 
 # Checks the source code with all features enabled.
-check-all-features:
+check-mixed:
 	cargo check --all-features
 	cargo check --all-features --tests
 
@@ -25,13 +25,14 @@ check-k256:
 	cargo check --no-default-features --features k256,serde,rand
 	cargo check --no-default-features --features k256,serde,rand --tests
 
-# Checks the source code with both k256 and secp256k1 features enabled.
-check-mixed:
-	cargo check --no-default-features --features k256,serde,rand,secp256k1 --tests
-	cargo check --no-default-features --features k256,serde,rand,secp256k1,secp256k1-invert --tests
 
+test: test-default test-mixed test-secp256k1 test-k256
 
-test: test-secp256k1 test-k256 test-mixed
+test-default:
+	cargo test
+
+test-mixed:
+	cargo test --all-features
 
 test-secp256k1:
 	cargo test --no-default-features --features secp256k1,serde,rand,secp256k1-invert
@@ -39,8 +40,6 @@ test-secp256k1:
 test-k256:
 	cargo test --no-default-features --features k256,serde,rand
 
-test-mixed:
-	cargo test --all-features
 
 .PHONY: docwatch
 docwatch:
