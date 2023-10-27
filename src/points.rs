@@ -409,9 +409,17 @@ impl MaybePoint {
     ///
     /// Returns [`MaybePoint::Infinity`] if the input is 33-hex-encoded zero bytes.
     pub fn from_hex(hex: &str) -> Result<Self, InvalidPointString> {
-        if bool::from(hex.as_bytes().ct_eq(POINT_INFINITY_STR.as_bytes())) {
+        let is_compressed_inf = hex
+            .as_bytes()
+            .ct_eq(POINT_INFINITY_COMPRESSED_STR.as_bytes());
+        let is_uncompressed_inf = hex
+            .as_bytes()
+            .ct_eq(POINT_INFINITY_UNCOMPRESSED_STR.as_bytes());
+
+        if bool::from(is_compressed_inf | is_uncompressed_inf) {
             return Ok(MaybePoint::Infinity);
         }
+
         Ok(MaybePoint::Valid(Point::from_hex(hex)?))
     }
 
@@ -850,8 +858,11 @@ mod conversions {
     }
 }
 
-pub(crate) const POINT_INFINITY_STR: &str =
+const POINT_INFINITY_COMPRESSED_STR: &str =
     "000000000000000000000000000000000000000000000000000000000000000000";
+const POINT_INFINITY_UNCOMPRESSED_STR: &str =
+    "000000000000000000000000000000000000000000000000000000000000000000\
+     0000000000000000000000000000000000000000000000000000000000000000";
 
 mod encodings {
     use super::*;
@@ -859,17 +870,33 @@ mod encodings {
     impl std::fmt::LowerHex for Point {
         /// Formats the Point as a DER-compressed hex string in lower case.
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            let mut buffer = [0; 66];
-            let encoded = base16ct::lower::encode_str(&self.serialize(), &mut buffer).unwrap();
-            f.write_str(encoded)
+            if f.sign_plus() {
+                let mut buffer = [0; 130];
+                let encoded =
+                    base16ct::lower::encode_str(&self.serialize_uncompressed(), &mut buffer)
+                        .unwrap();
+                f.write_str(encoded)
+            } else {
+                let mut buffer = [0; 66];
+                let encoded = base16ct::lower::encode_str(&self.serialize(), &mut buffer).unwrap();
+                f.write_str(encoded)
+            }
         }
     }
     impl std::fmt::UpperHex for Point {
         /// Formats the Point as a DER-compressed hex string in upper case.
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            let mut buffer = [0; 66];
-            let encoded = base16ct::upper::encode_str(&self.serialize(), &mut buffer).unwrap();
-            f.write_str(encoded)
+            if f.sign_plus() {
+                let mut buffer = [0; 130];
+                let encoded =
+                    base16ct::upper::encode_str(&self.serialize_uncompressed(), &mut buffer)
+                        .unwrap();
+                f.write_str(encoded)
+            } else {
+                let mut buffer = [0; 66];
+                let encoded = base16ct::upper::encode_str(&self.serialize(), &mut buffer).unwrap();
+                f.write_str(encoded)
+            }
         }
     }
 
@@ -878,7 +905,13 @@ mod encodings {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
             match self {
                 Valid(point) => point.fmt(f),
-                Infinity => f.write_str(POINT_INFINITY_STR),
+                Infinity => {
+                    if f.sign_plus() {
+                        f.write_str(POINT_INFINITY_UNCOMPRESSED_STR)
+                    } else {
+                        f.write_str(POINT_INFINITY_COMPRESSED_STR)
+                    }
+                }
             }
         }
     }
@@ -888,7 +921,7 @@ mod encodings {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
             match self {
                 Valid(point) => point.fmt(f),
-                Infinity => f.write_str(POINT_INFINITY_STR),
+                Infinity => <Self as std::fmt::LowerHex>::fmt(self, f),
             }
         }
     }
@@ -897,7 +930,7 @@ mod encodings {
         /// Serializes and displays the point as a compressed point
         /// in hex format.
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            write!(f, "{:x}", self)
+            <Self as std::fmt::LowerHex>::fmt(self, f)
         }
     }
 
@@ -905,10 +938,7 @@ mod encodings {
         /// Serializes and displays the point as a compressed point
         /// in hex format.
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            match self {
-                Valid(ref point) => point.fmt(f),
-                Infinity => f.write_str(POINT_INFINITY_STR),
-            }
+            <Self as std::fmt::LowerHex>::fmt(self, f)
         }
     }
 
@@ -1005,6 +1035,10 @@ mod encodings {
 
     impl TryFrom<[u8; 33]> for Point {
         type Error = InvalidPointBytes;
+
+        /// Parses a compressed DER encoding of a point. See [`Point::serialize`].
+        /// Returns [`InvalidPointBytes`] if the bytes do not represent a valid
+        /// non-infinity curve point.
         fn try_from(bytes: [u8; 33]) -> Result<Self, Self::Error> {
             Self::try_from(&bytes)
         }
@@ -1012,6 +1046,12 @@ mod encodings {
 
     impl TryFrom<[u8; 33]> for MaybePoint {
         type Error = InvalidPointBytes;
+
+        /// Parses a compressed DER encoding of a point. See [`MaybePoint::serialize`].
+        /// Returns [`InvalidPointBytes`] if the bytes do not represent a valid
+        /// curve point.
+        ///
+        /// Also accepts 33 zero bytes, which is interpreted as the point at infinity.
         fn try_from(bytes: [u8; 33]) -> Result<Self, Self::Error> {
             Self::try_from(&bytes)
         }
@@ -1025,6 +1065,9 @@ mod encodings {
     }
 
     impl From<MaybePoint> for [u8; 33] {
+        /// Serializes the point to DER-compressed format.
+        ///
+        /// Returns 33 zero bytes if `maybe_point == MaybePoint::Infinity`.
         fn from(maybe_point: MaybePoint) -> Self {
             maybe_point.serialize()
         }
@@ -1041,14 +1084,14 @@ mod encodings {
         }
     }
 
-    /// Parses an uncompressed DER encoding of a point. See [`MaybePoint::serialize_uncompressed`].
-    /// Returns [`InvalidPointBytes`] if the bytes do not represent a valid
-    /// curve point.
-    ///
-    /// Also accepts 65 zero bytes, which is interpreted as the point at infinity.
     impl TryFrom<&[u8; 65]> for MaybePoint {
         type Error = InvalidPointBytes;
 
+        /// Parses an uncompressed DER encoding of a point. See [`MaybePoint::serialize_uncompressed`].
+        /// Returns [`InvalidPointBytes`] if the bytes do not represent a valid
+        /// curve point.
+        ///
+        /// Also accepts 65 zero bytes, which is interpreted as the point at infinity.
         fn try_from(bytes: &[u8; 65]) -> Result<Self, Self::Error> {
             if bool::from(bytes.ct_eq(&[0; 65])) {
                 return Ok(MaybePoint::Infinity);
@@ -1059,6 +1102,9 @@ mod encodings {
 
     impl TryFrom<[u8; 65]> for Point {
         type Error = InvalidPointBytes;
+        /// Parses an uncompressed DER encoding of a point. See [`Point::serialize_uncompressed`].
+        /// Returns [`InvalidPointBytes`] if the bytes do not represent a valid
+        /// non-infinity curve point.
         fn try_from(bytes: [u8; 65]) -> Result<Self, Self::Error> {
             Self::try_from(&bytes)
         }
@@ -1066,6 +1112,11 @@ mod encodings {
 
     impl TryFrom<[u8; 65]> for MaybePoint {
         type Error = InvalidPointBytes;
+        /// Parses an uncompressed DER encoding of a point. See [`MaybePoint::serialize_uncompressed`].
+        /// Returns [`InvalidPointBytes`] if the bytes do not represent a valid
+        /// curve point.
+        ///
+        /// Also accepts 65 zero bytes, which is interpreted as the point at infinity.
         fn try_from(bytes: [u8; 65]) -> Result<Self, Self::Error> {
             Self::try_from(&bytes)
         }
