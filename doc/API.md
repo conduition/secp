@@ -1,3 +1,15 @@
+# Features
+
+| Feature | Description | Dependencies | Enabled by Default |
+|---------|-------------|--------------|:------------------:|
+| `secp256k1` | Use [`libsecp256k1`](https://github.com/bitcoin-core/secp256k1) bindings for elliptic curve math. Include trait implementations for converting to and from types in [the `secp256k1` crate][secp256k1]. This feature supercedes the `k256` feature if that one is enabled. | [`secp256k1`] | ✅ |
+| `k256` | Use [the `k256` crate][k256] for elliptic curve math. This enables a pure-rust build. Include trait implementations for types from `k256`. If the `secp256k1` feature is enabled, then `k256` will still be brought in and trait implementations will be included, but the actual curve math will be done by `libsecp256k1`. | [`k256`] | ❌ |
+| `serde` | Implement serialization and deserialization for types in this crate. | [`serde`](https://docs.rs/serde) | ❌ |
+| `rand` | Enable support for random scalar sampling with a CSPRNG, via [the `rand` crate](https://crates.io/crates/rand) | [`rand`] | ❌ |
+| `secp256k1-invert` | `libsecp256k1` doesn't expose any functionality to invert scalars modulo the curve order (i.e. to compute t<sup>-1</sup> for some scalar t, so that t(t<sup>-1</sup>) = 1 mod n). Inversion is useful for certain cryptographic operations, such as ECDSA signing, or OPRFs. <br> <br> Enable this feature if you need to invert scalars but you only have the `secp256k1` feature enabled. This feature is only useful if the `secp256k1` feature is enabled but `k256` is not, as the [`k256`] crate provides scalar inversion methods. This feature pulls in [the `crypto-bigint` crate][crypto_bigint] to perform the inversion. | [`crypto_bigint`] | ❌ |
+
+# Usage
+
 The `secp` crate's primary export is four types which can be used to represent elliptic curve points (e.g. public keys) and scalars (e.g. private keys).
 
 - [`Scalar`] for non-zero scalar values.
@@ -38,7 +50,7 @@ k256::AffinePoint::from(point);
 
 # Scalars
 
-A [`Scalar`] can represent any integers in the range `[1, n)`, while a [`MaybeScalar`] represents any integer in the range `[0, n)`, where `n` is the secp256k1 elliptic curve order (the number of possible points on the curve). As [`Scalar`] is never zero it doesn't implement [`Default`]). [`MaybeScalar:Zero`] represents the integer zero.
+A [`Scalar`] can represent any integers in the range `[1, n)`, while a [`MaybeScalar`] represents any integer in the range `[0, n)`, where `n` is the secp256k1 elliptic curve order (the number of possible points on the curve). As [`Scalar`] is never zero it doesn't implement [`Default`]). [`MaybeScalar::Zero`] represents the integer zero.
 
 ```rust
 # use secp::Scalar;

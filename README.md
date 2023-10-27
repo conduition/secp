@@ -70,6 +70,6 @@ cargo add secp --no-default-features --features k256
 
 If both `k256` and `secp256k1` features are enabled, then we default to using `libsecp256k1` bindings for the actual math, but still provide trait implementations to make this crate interoperable with `k256`.
 
-## API
+## Documentation
 
 To see the API documentation, [head on over to docs.rs](https://docs.rs/secp).
