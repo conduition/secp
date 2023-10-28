@@ -59,7 +59,7 @@ assert!(schnorr_verify(public_key, signature, message));
 
 This crate does not implement elliptic curve point math directly. Instead we depend on one of two reputable elliptic curve cryptography libraries:
 
-- C bindings to [`libsecp256k1`](https://github.com/bitcoin-core/secp256k1), via [the `secp256k1` crate](https::crates.io/crates/secp256k1), maintained by the Bitcoin Core team.
+- C bindings to [`libsecp256k1`](https://github.com/bitcoin-core/secp256k1), via [the `secp256k1` crate](https://crates.io/crates/secp256k1), maintained by the Bitcoin Core team.
 - A pure-rust implementation via [the `k256` crate](https://crates.io/crates/k256), maintained by the [RustCrypto](https://github.com/RustCrypto) team.
 
 **One or the other can be used.** By default, this crate prefers to rely on `libsecp256k1`, as this is the most vetted and publicly trusted implementation of secp256k1 curve math available anywhere. However, if you need a pure-rust implementation, you can install this crate without it, and use the pure-rust `k256` crate instead.
