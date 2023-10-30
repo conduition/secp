@@ -36,3 +36,6 @@ k256 = ["dep:k256"]
 serde = ["dep:serde", "secp256k1?/serde", "dep:serdect"]
 rand = ["dep:rand", "secp256k1?/rand-std"]
 secp256k1-invert = ["dep:crypto-bigint"]
+
+[package.metadata.docs.rs]
+all-features = true
