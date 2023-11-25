@@ -398,6 +398,17 @@ impl MaybePoint {
         }
     }
 
+    /// Serializes the point into BIP340 X-only representation. This consists solely of the
+    /// big-endian encoding of the point's X-coordinate.
+    ///
+    /// If `self == MaybePoint::Infinity`, this returns 32 zero bytes.
+    pub fn serialize_xonly(&self) -> [u8; 32] {
+        match self {
+            Valid(point) => point.serialize_xonly(),
+            Infinity => [0; 32],
+        }
+    }
+
     /// Parses a point from a given byte slice, which can be either 33 or 65 bytes
     /// long, depending on whether it represents a compressed or uncompressed point.
     pub fn from_slice(bytes: &[u8]) -> Result<Self, InvalidPointBytes> {
@@ -421,6 +432,51 @@ impl MaybePoint {
         }
 
         Ok(MaybePoint::Valid(Point::from_hex(hex)?))
+    }
+
+    /// Returns `subtle::Choice::from(0)` if the point's Y-coordinate is even or infinity.
+    /// Returns `subtle::Choice::from(1)` if the Y-coordinate is odd.
+    pub fn parity(&self) -> subtle::Choice {
+        match self {
+            Infinity => subtle::Choice::from(0),
+            Valid(p) => p.parity(),
+        }
+    }
+
+    /// Returns `true` if the point's Y-coordinate is even, or `false` if the Y-coordinate is odd.
+    /// Also returns true if the point is [`Infinity`].
+    pub fn has_even_y(&self) -> bool {
+        bool::from(!self.parity())
+    }
+
+    /// Returns `true` if the point's Y-coordinate is odd, or `false` if the Y-coordinate is even.
+    /// Returns false if the point is [`Infinity`].
+    pub fn has_odd_y(&self) -> bool {
+        bool::from(self.parity())
+    }
+
+    /// Returns a point with the same X-coordinate but with the Y-coordinate's parity set
+    /// to the given parity, with `subtle::Choice::from(1)` indicating odd parity and
+    /// `subtle::Choice::from(0)` indicating even parity.
+    ///
+    /// The [`Infinity`] point is returned unchanged.
+    pub fn with_parity(self, parity: subtle::Choice) -> Self {
+        match self {
+            Infinity => self,
+            Valid(p) => Valid(p.with_parity(parity)),
+        }
+    }
+
+    /// Returns a new point with the Y-coordinate coerced flipped to be even.
+    /// The [`Infinity`] point is returned unchanged.
+    pub fn to_even_y(self) -> Self {
+        self.with_parity(subtle::Choice::from(0))
+    }
+
+    /// Returns a new point with the Y-coordinate coerced flipped to be odd.
+    /// The [`Infinity`] point is returned unchanged.
+    pub fn to_odd_y(self) -> Self {
+        self.with_parity(subtle::Choice::from(1))
     }
 
     /// Aggregate an iterator of points together by simple summation.
