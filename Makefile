@@ -15,15 +15,15 @@ check-secp256k1:
 	cargo check --no-default-features --features secp256k1
 	cargo check --no-default-features --features secp256k1,serde
 	cargo check --no-default-features --features secp256k1,serde,rand
-	cargo check --no-default-features --features secp256k1,serde,rand,secp256k1-invert
-	cargo check --no-default-features --features secp256k1,serde,rand,secp256k1-invert --tests
+	cargo check --no-default-features --features secp256k1,serde,rand,secp256k1-invert,num-traits
+	cargo check --no-default-features --features secp256k1,serde,rand,secp256k1-invert,num-traits --tests
 
 # Checks the source code with variations of pure-rust feature sets.
 check-k256:
 	cargo check --no-default-features --features k256
 	cargo check --no-default-features --features k256,serde
-	cargo check --no-default-features --features k256,serde,rand
-	cargo check --no-default-features --features k256,serde,rand --tests
+	cargo check --no-default-features --features k256,serde,rand,num-traits
+	cargo check --no-default-features --features k256,serde,rand,num-traits --tests
 
 
 test: test-default test-mixed test-secp256k1 test-k256
@@ -35,10 +35,10 @@ test-mixed:
 	cargo test --all-features
 
 test-secp256k1:
-	cargo test --no-default-features --features secp256k1,serde,rand,secp256k1-invert
+	cargo test --no-default-features --features secp256k1,serde,rand,secp256k1-invert,num-traits
 
 test-k256:
-	cargo test --no-default-features --features k256,serde,rand
+	cargo test --no-default-features --features k256,serde,rand,num-traits
 
 
 .PHONY: docwatch

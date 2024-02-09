@@ -588,6 +588,38 @@ mod std_traits {
     }
 }
 
+#[cfg(feature = "num-traits")]
+mod num_traits_impls {
+    use super::*;
+
+    impl num_traits::One for Scalar {
+        fn one() -> Self {
+            Scalar::one()
+        }
+        fn is_one(&self) -> bool {
+            *self == Scalar::one()
+        }
+    }
+
+    impl num_traits::One for MaybeScalar {
+        fn one() -> Self {
+            MaybeScalar::one()
+        }
+        fn is_one(&self) -> bool {
+            *self == MaybeScalar::one()
+        }
+    }
+
+    impl num_traits::Zero for MaybeScalar {
+        fn zero() -> Self {
+            Zero
+        }
+        fn is_zero(&self) -> bool {
+            self == &Zero
+        }
+    }
+}
+
 mod conversions {
     use super::*;
 

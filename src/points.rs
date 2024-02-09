@@ -1283,6 +1283,16 @@ where
     }
 }
 
+#[cfg(feature = "num-traits")]
+impl num_traits::Zero for MaybePoint {
+    fn zero() -> Self {
+        Infinity
+    }
+    fn is_zero(&self) -> bool {
+        self == &Infinity
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(non_snake_case)]
