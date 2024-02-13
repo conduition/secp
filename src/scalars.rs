@@ -618,6 +618,31 @@ mod num_traits_impls {
             self == &Zero
         }
     }
+
+    impl num_traits::Inv for Scalar {
+        type Output = Scalar;
+        fn inv(self) -> Self::Output {
+            self.invert()
+        }
+    }
+
+    impl num_traits::Bounded for Scalar {
+        fn min_value() -> Self {
+            Scalar::one()
+        }
+        fn max_value() -> Self {
+            Scalar::max()
+        }
+    }
+
+    impl num_traits::Bounded for MaybeScalar {
+        fn min_value() -> Self {
+            Zero
+        }
+        fn max_value() -> Self {
+            MaybeScalar::max()
+        }
+    }
 }
 
 mod conversions {
