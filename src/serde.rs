@@ -1,4 +1,4 @@
-#![cfg(any(test, feature = "serde"))]
+#![cfg(feature = "serde")]
 
 use super::{MaybePoint, MaybeScalar, Point, Scalar};
 
