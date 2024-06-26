@@ -1,4 +1,4 @@
-.PHONY: check check-* test test-*
+.PHONY: check check-* test test-* cli-*
 check: check-default check-mixed check-secp256k1 check-k256
 
 # Checks the source code with default features enabled.
@@ -40,6 +40,13 @@ test-secp256k1:
 test-k256:
 	cargo test --no-default-features --features k256,serde,rand,num-traits
 
+cli: cli-release
+
+cli-debug:
+	cargo build --no-default-features --features secp256k1,rand,secp256k1-invert
+
+cli-release:
+	cargo build --release --no-default-features --features secp256k1,rand,secp256k1-invert
 
 .PHONY: docwatch
 docwatch:

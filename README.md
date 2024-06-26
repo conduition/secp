@@ -73,3 +73,53 @@ If both `k256` and `secp256k1` features are enabled, then we default to using `l
 ## Documentation
 
 To see the API documentation, [head on over to docs.rs](https://docs.rs/secp).
+
+## CLI
+
+This crate also offers a CLI tool for computing secp256k1 curve operations in your shell. Build it with `make cli`. A binary will be built at `target/release/secp`.
+
+```
+Usage:
+
+-- Scalar operations --
+  secp scalar gen                           Generate a random scalar.
+  secp scalar add <scalar> [<scalar>...]    Sum two or more scalars.
+  secp scalar mul <scalar> [<scalar>...]    Multiply two or more scalars.
+  secp scalar inv <scalar>                  Multiplicative inverse of a scalar mod n.
+
+-- Point operations --
+  secp scalar gen                           Generate a random point.
+  secp point add <point> [<point>...]       Sum two or more points.
+  secp point mul <point> [<scalar>...]      Multiply a point by one or more scalars.
+
+-- Formats --
+
+Points are represented in 65-byte compressed hex format. Example:
+
+  02eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+
+Scalars are represented in 32-byte hex format. Example:
+
+  e8c23ee3c98e040adea5dc92c5c381d6be93615f289ec2d505909657368a0c8f
+
+Prepending a minus sign '-' in front of a point or scalar will negate it. Example:
+
+  -02eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+
+-- Special values --
+
+- The values '0', '1', or '-1' may be substituted for any scalar.
+- The value 'G' may be substituted for any point to represent the secp256k1 base point.
+- The value '0' may be substituted for any point to represent the additive identity point (infinity).
+```
+
+Example usage:
+
+```console
+s1=`secp scalar gen`
+s2=`secp scalar gen`
+p1=`secp point mul G $s1`
+p2=`secp point mul G $s2`
+p3=`secp point add $p1 $p2`
+p4=`secp point add $p1 -$p2`
+```
