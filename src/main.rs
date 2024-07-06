@@ -16,7 +16,7 @@ fn usage() {
     println!("");
     println!("-- Scalar operations --");
 
-    #[cfg(feature = "cli")]
+    #[cfg(feature = "cli-rng")]
     println!("  secp scalar gen                           Generate a random scalar.");
     println!("  secp scalar add <scalar> [<scalar>...]    Sum two or more scalars.");
     println!("  secp scalar mul <scalar> [<scalar>...]    Multiply two or more scalars.");
@@ -26,7 +26,7 @@ fn usage() {
     );
     println!("");
     println!("-- Point operations --");
-    #[cfg(feature = "cli")]
+    #[cfg(feature = "cli-rng")]
     println!("  secp scalar gen                           Generate a random point.");
     println!("  secp point add <point> [<point>...]       Sum two or more points.");
     println!(
@@ -140,7 +140,7 @@ fn parse_point(mut point_str: &str) -> Result<MaybePoint, Error> {
 
 fn run_scalar_op(args: &[String]) -> Result<(), Error> {
     match args[0].as_str() {
-        #[cfg(feature = "cli")]
+        #[cfg(feature = "cli-rng")]
         "gen" => {
             println!("{:x}", Scalar::random(&mut rand::thread_rng()));
         }
@@ -192,7 +192,7 @@ fn run_scalar_op(args: &[String]) -> Result<(), Error> {
 
 fn run_point_op(args: &[String]) -> Result<(), Error> {
     match args[0].as_str() {
-        #[cfg(feature = "cli")]
+        #[cfg(feature = "cli-rng")]
         "gen" => {
             println!("{:x}", Scalar::random(&mut rand::thread_rng()) * G);
         }

@@ -8,6 +8,7 @@
 | `rand` | Enable support for random scalar sampling with a CSPRNG, via [the `rand` crate](https://crates.io/crates/rand) | [`rand`] | ❌ |
 | `secp256k1-invert` | `libsecp256k1` doesn't expose any functionality to invert scalars modulo the curve order (i.e. to compute t<sup>-1</sup> for some scalar t, so that t(t<sup>-1</sup>) = 1 mod n). Inversion is useful for certain cryptographic operations, such as ECDSA signing, or OPRFs. <br> <br> Enable this feature if you need to invert scalars but you only have the `secp256k1` feature enabled. This feature is only useful if the `secp256k1` feature is enabled but `k256` is not, as the [`k256`] crate provides scalar inversion methods. This feature pulls in [the `crypto-bigint` crate][crypto_bigint] to perform the inversion. | [`crypto_bigint`] | ❌ |
 | `num-traits` | Enable support for numeric identity traits via [the `num-traits` crate](https://crates.io/crates/num-traits). | [`num_traits`] | ❌ |
+| `cli-rng` | Enable RNG features needed to compile the `secp` CLI program. **Not for public use.** | [`rand`] | ❌ |
 
 # Usage
 

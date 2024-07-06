@@ -31,7 +31,7 @@ sha2 = "0.10.8"
 
 [features]
 default = ["secp256k1"]
-cli = ["rand", "rand/std", "secp256k1-invert"]
+cli-rng = ["rand", "rand/std"]
 secp256k1 = ["dep:secp256k1"]
 k256 = ["dep:k256"]
 serde = ["dep:serde", "secp256k1?/serde", "dep:serdect"]
