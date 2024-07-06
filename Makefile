@@ -43,10 +43,10 @@ test-k256:
 cli: cli-release
 
 cli-debug:
-	cargo build --no-default-features --features secp256k1,rand,secp256k1-invert
+	cargo build --no-default-features --features secp256k1,cli
 
 cli-release:
-	cargo build --release --no-default-features --features secp256k1,rand,secp256k1-invert
+	cargo build --release --no-default-features --features secp256k1,cli
 
 .PHONY: docwatch
 docwatch:
