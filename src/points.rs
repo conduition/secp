@@ -1267,16 +1267,21 @@ where
     {
         let mut sum = MaybePoint::Infinity;
         let mut chunk = [MaybePoint::Infinity; 2048];
-        let mut last: usize;
+        let mut next: usize;
 
         loop {
-            last = 0;
-            while let Some(point) = iter.next() {
-                chunk[last] = MaybePoint::from(point);
-                last += 1;
+            next = 0;
+            while next < chunk.len() {
+                if let Some(point) = iter.next() {
+                    chunk[next] = MaybePoint::from(point);
+                    next += 1;
+                } else {
+                    break;
+                }
             }
-            sum += MaybePoint::sum(&chunk[..last + 1]);
-            if last != chunk.len() - 1 {
+
+            sum += MaybePoint::sum(&chunk[..next]);
+            if next < chunk.len() {
                 return sum;
             }
         }
@@ -1655,5 +1660,32 @@ mod tests {
         let mut P2 = Valid(Point::generator());
         P2 *= MaybeScalar::Valid(scalar);
         assert_eq!(P2, Valid(pub_point));
+    }
+
+    #[test]
+    fn point_iter_sum() {
+        {
+            let scalars: Vec<Scalar> = (1..1000)
+                .map(|i: u128| Scalar::try_from(i).unwrap())
+                .collect();
+            let points: Vec<Point> = scalars.iter().map(|&k| k.base_point_mul()).collect();
+
+            assert_eq!(
+                points.into_iter().sum::<MaybePoint>(),
+                scalars.into_iter().sum::<MaybeScalar>().base_point_mul()
+            );
+        }
+
+        {
+            let scalars: Vec<Scalar> = (1..10000)
+                .map(|i: u128| Scalar::try_from(i).unwrap())
+                .collect();
+            let points: Vec<Point> = scalars.iter().map(|&k| k.base_point_mul()).collect();
+
+            assert_eq!(
+                points.into_iter().sum::<MaybePoint>(),
+                scalars.into_iter().sum::<MaybeScalar>().base_point_mul()
+            );
+        }
     }
 }
