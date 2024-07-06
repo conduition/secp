@@ -78,7 +78,7 @@ To see the API documentation, [head on over to docs.rs](https://docs.rs/secp).
 
 This crate also offers a CLI tool for computing secp256k1 curve operations in your shell. Build it with `make cli`. A binary will be built at `target/release/secp`.
 
-```
+```not_rust
 Usage:
 
 -- Scalar operations --
