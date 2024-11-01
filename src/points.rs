@@ -259,7 +259,7 @@ impl Point {
                 .collect();
 
             secp256k1::PublicKey::combine_keys(&pubkeys_vec)
-                .map(|pubkey| MaybePoint::from(pubkey))
+                .map(MaybePoint::from)
                 .unwrap_or(MaybePoint::Infinity)
         };
 
@@ -1437,13 +1437,13 @@ mod tests {
         for (p1_str, p2_str, sum_str) in point_hex_fixtures {
             let P1: MaybePoint = p1_str
                 .parse()
-                .expect(&format!("failed to parse P1 fixture point {}", p1_str));
+                .unwrap_or_else(|_| panic!("failed to parse P1 fixture point {}", p1_str));
             let P2: MaybePoint = p2_str
                 .parse()
-                .expect(&format!("failed to parse P2 fixture point {}", p2_str));
+                .unwrap_or_else(|_| panic!("failed to parse P2 fixture point {}", p2_str));
             let sum: MaybePoint = sum_str
                 .parse()
-                .expect(&format!("failed to parse sum fixture point {}", sum_str));
+                .unwrap_or_else(|_| panic!("failed to parse sum fixture point {}", sum_str));
 
             assert_eq!(P1 + P2, sum, "\n{} \n+ {} \n= {}", P1, P2, sum);
             assert_eq!(sum - P1, P2, "\n{} \n- {} \n= {}", sum, P1, P2);

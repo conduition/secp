@@ -13,7 +13,7 @@ use std::{env, process};
 
 fn usage() {
     println!("Usage:");
-    println!("");
+    println!();
     println!("-- Scalar operations --");
 
     #[cfg(feature = "cli-rng")]
@@ -24,7 +24,7 @@ fn usage() {
     println!(
         "  secp scalar inv <scalar>                  Multiplicative inverse of a scalar mod n."
     );
-    println!("");
+    println!();
     println!("-- Point operations --");
     #[cfg(feature = "cli-rng")]
     println!("  secp scalar gen                           Generate a random point.");
@@ -32,29 +32,29 @@ fn usage() {
     println!(
         "  secp point mul <point> [<scalar>...]      Multiply a point by one or more scalars."
     );
-    println!("");
+    println!();
     println!("-- Formats --");
-    println!("");
+    println!();
     println!("Points are represented in 65-byte compressed hex format. Example:");
-    println!("");
+    println!();
     println!("  02eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
-    println!("");
+    println!();
     println!("Scalars are represented in 32-byte hex format. Example:");
-    println!("");
+    println!();
     println!("  e8c23ee3c98e040adea5dc92c5c381d6be93615f289ec2d505909657368a0c8f");
-    println!("");
+    println!();
     println!("Prepending a minus sign '-' in front of a point or scalar will negate it. Example:");
-    println!("");
+    println!();
     println!("  -02eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
-    println!("");
+    println!();
     println!("-- Special values --");
-    println!("");
+    println!();
     println!("- The values '0', '1', or '-1' may be substituted for any scalar.");
     println!(
         "- The value 'G' may be substituted for any point to represent the secp256k1 base point."
     );
     println!("- The value '0' may be substituted for any point to represent the additive identity point (infinity).");
-    println!("");
+    println!();
 }
 
 enum Error {
@@ -97,7 +97,7 @@ fn main() {
 }
 
 fn parse_scalar(mut scalar_str: &str) -> Result<MaybeScalar, Error> {
-    let is_neg = scalar_str.starts_with("-");
+    let is_neg = scalar_str.starts_with('-');
     if is_neg {
         scalar_str = &scalar_str[1..];
     }
@@ -118,7 +118,7 @@ fn parse_scalar(mut scalar_str: &str) -> Result<MaybeScalar, Error> {
 }
 
 fn parse_point(mut point_str: &str) -> Result<MaybePoint, Error> {
-    let is_neg = point_str.starts_with("-");
+    let is_neg = point_str.starts_with('-');
     if is_neg {
         point_str = &point_str[1..];
     }

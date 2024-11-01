@@ -282,10 +282,10 @@ where
         //
         // We want `whole_slice_is_gt` to remain true if we ever found this condition,
         // but since we're aiming for constant-time, we cannot break the loop.
-        whole_slice_is_gt |= whole_slice_is_eq & v1.ct_gt(&v2);
+        whole_slice_is_gt |= whole_slice_is_eq & v1.ct_gt(v2);
 
         // Track whether all elements in the slices up to this point are equal.
-        whole_slice_is_eq &= v1.ct_eq(&v2);
+        whole_slice_is_eq &= v1.ct_eq(v2);
     }
 
     let l_len = lhs.len() as u64;
@@ -481,7 +481,7 @@ impl MaybeScalar {
         // Modulus must be less than or equal to `n`, as `n-1` is the largest number we can represent.
         debug_assert!(modulus <= &CURVE_ORDER_BYTES);
 
-        let modulus_neg_bytes = xor_arrays(&modulus, &MAX_U256);
+        let modulus_neg_bytes = xor_arrays(modulus, &MAX_U256);
 
         // Modulus must not be too small either, or we won't be able
         // to represent the distance to MAX_U256.
@@ -1343,7 +1343,7 @@ impl std::iter::Product<Scalar> for Scalar {
     fn product<I: Iterator<Item = Scalar>>(iter: I) -> Self {
         let mut product = Scalar::one();
         for scalar in iter {
-            product = product * scalar;
+            product *= scalar;
         }
         product
     }
@@ -1414,11 +1414,9 @@ mod tests {
         for scalar_hex in valid_scalar_hex {
             let parsed = scalar_hex
                 .parse::<Scalar>()
-                .expect(&format!("failed to parse valid Scalar: {}", scalar_hex));
-            let maybe_parsed = scalar_hex.parse::<MaybeScalar>().expect(&format!(
-                "failed to parse valid MaybeScalar: {}",
-                scalar_hex
-            ));
+                .unwrap_or_else(|_| panic!("failed to parse valid Scalar: {}", scalar_hex));
+            let maybe_parsed = scalar_hex.parse::<MaybeScalar>().unwrap_or_else(|_| panic!("failed to parse valid MaybeScalar: {}",
+                scalar_hex));
 
             let bytes = <[u8; 32]>::try_from(hex::decode(scalar_hex).unwrap())
                 .expect("failed to parse hex as 32-byte array");
@@ -1972,8 +1970,8 @@ mod tests {
                 .unwrap(),
         ];
 
-        let mut expected_sorting = scalars.clone();
-        expected_sorting.sort_by(|a, b| a.serialize().cmp(&b.serialize()));
+        let mut expected_sorting = scalars;
+        expected_sorting.sort_by_key(|a| a.serialize());
 
         scalars.sort_by(|a, b| {
             if bool::from(a.ct_gt(b)) {
