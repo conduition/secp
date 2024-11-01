@@ -174,7 +174,7 @@ impl Point {
 
         #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
         let inner = {
-            let mut affine = self.inner.as_affine().clone();
+            let mut affine = *self.inner.as_affine();
             let should_negate = affine.y_is_odd() ^ parity;
             affine.conditional_assign(&(-affine), should_negate);
             k256::PublicKey::from_affine(affine).unwrap()
@@ -898,7 +898,7 @@ mod conversions {
 
             impl From<Point> for k256::AffinePoint {
                 fn from(point: Point) -> Self {
-                    return k256::AffinePoint::from(k256::PublicKey::from(point));
+                    k256::AffinePoint::from(k256::PublicKey::from(point))
                 }
             }
 
@@ -1234,11 +1234,11 @@ impl ConditionallySelectable for MaybePoint {
         return {
             let mut affine = match a {
                 MaybePoint::Infinity => k256::AffinePoint::IDENTITY,
-                MaybePoint::Valid(point) => point.inner.as_affine().clone(),
+                MaybePoint::Valid(point) => *point.inner.as_affine(),
             };
             let b_affine = match b {
                 MaybePoint::Infinity => k256::AffinePoint::IDENTITY,
-                MaybePoint::Valid(point) => point.inner.as_affine().clone(),
+                MaybePoint::Valid(point) => *point.inner.as_affine(),
             };
             affine.conditional_assign(&b_affine, choice);
 

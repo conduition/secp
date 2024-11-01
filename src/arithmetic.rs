@@ -144,9 +144,7 @@ mod inner_operator_impl {
             return self.negate(&LIBSECP256K1_CTX);
 
             #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
-            return Point::from(
-                k256::PublicKey::from_affine(-self.inner.as_affine().clone()).unwrap(),
-            );
+            return Point::from(k256::PublicKey::from_affine(-(*self.inner.as_affine())).unwrap());
         }
     }
     impl std::ops::Neg for MaybePoint {
@@ -395,6 +393,7 @@ mod division {
 
     /// To divide by `rhs`, we simply multiply by `rhs.inverse()`, because `rhs.inverse()`
     /// is algebraically the same as `1 / rhs`.
+    #[allow(clippy::suspicious_arithmetic_impl)]
     impl std::ops::Div<Scalar> for Scalar {
         type Output = Scalar;
         fn div(self, rhs: Scalar) -> Self::Output {
@@ -404,6 +403,7 @@ mod division {
 
     /// To divide by `rhs`, we simply multiply by `rhs.inverse()`, because `rhs.inverse()`
     /// is algebraically the same as `1 / rhs`.
+    #[allow(clippy::suspicious_arithmetic_impl)]
     impl std::ops::Div<Scalar> for Point {
         type Output = Point;
         fn div(self, rhs: Scalar) -> Self::Output {
@@ -413,6 +413,7 @@ mod division {
 
     /// To divide by `rhs`, we simply multiply by `rhs.inverse()`, because `rhs.inverse()`
     /// is algebraically the same as `1 / rhs`.
+    #[allow(clippy::suspicious_arithmetic_impl)]
     impl std::ops::Div<Scalar> for G {
         type Output = Point;
         fn div(self, rhs: Scalar) -> Self::Output {

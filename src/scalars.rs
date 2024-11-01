@@ -5,7 +5,7 @@ use super::errors::{InvalidScalarBytes, InvalidScalarString, ZeroScalarError};
 use super::{MaybePoint, Point};
 
 #[cfg(feature = "secp256k1")]
-pub(crate) const LIBSECP256K1_CTX: Lazy<secp256k1::Secp256k1<secp256k1::All>> =
+pub(crate) static LIBSECP256K1_CTX: Lazy<secp256k1::Secp256k1<secp256k1::All>> =
     Lazy::new(secp256k1::Secp256k1::new);
 
 static SCALAR_ONE: Lazy<Scalar> = Lazy::new(|| {
@@ -914,7 +914,7 @@ mod conversions {
 
             impl From<Scalar> for k256::Scalar {
                 fn from(scalar: Scalar) -> Self {
-                    k256::NonZeroScalar::from(scalar).as_ref().clone()
+                    *k256::NonZeroScalar::from(scalar).as_ref()
                 }
             }
 
@@ -1214,11 +1214,11 @@ mod subtle_traits {
             return {
                 let a_inner = a
                     .into_option()
-                    .map(|scalar| scalar.inner.as_ref().clone())
+                    .map(|scalar| *scalar.inner.as_ref())
                     .unwrap_or(k256::Scalar::ZERO);
                 let b_inner = b
                     .into_option()
-                    .map(|scalar| scalar.inner.as_ref().clone())
+                    .map(|scalar| *scalar.inner.as_ref())
                     .unwrap_or(k256::Scalar::ZERO);
 
                 let inner_scalar = k256::Scalar::conditional_select(&a_inner, &b_inner, choice);
@@ -1415,8 +1415,9 @@ mod tests {
             let parsed = scalar_hex
                 .parse::<Scalar>()
                 .unwrap_or_else(|_| panic!("failed to parse valid Scalar: {}", scalar_hex));
-            let maybe_parsed = scalar_hex.parse::<MaybeScalar>().unwrap_or_else(|_| panic!("failed to parse valid MaybeScalar: {}",
-                scalar_hex));
+            let maybe_parsed = scalar_hex
+                .parse::<MaybeScalar>()
+                .unwrap_or_else(|_| panic!("failed to parse valid MaybeScalar: {}", scalar_hex));
 
             let bytes = <[u8; 32]>::try_from(hex::decode(scalar_hex).unwrap())
                 .expect("failed to parse hex as 32-byte array");

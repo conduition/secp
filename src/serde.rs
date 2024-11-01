@@ -71,7 +71,7 @@ impl<'de> Deserialize<'de> for MaybePoint {
         let bytes = serdect::slice::deserialize_hex_or_bin(&mut buffer, deserializer)?;
         MaybePoint::try_from(bytes).map_err(|_| {
             serde::de::Error::invalid_value(
-                serde::de::Unexpected::Bytes(&bytes),
+                serde::de::Unexpected::Bytes(bytes),
                 &"a 33-byte array representing a compressed curve point or infinity",
             )
         })
@@ -178,7 +178,7 @@ mod tests {
             "fdbf1eee1ffc22505dd284e866a3b16006e218f130c20c0bbf455d4b2c063acf",
             "aa031ac5f64874895ffa5c17b4b9f06cfa63407e34a2c8017a630651f8e8bd9d\"",
         );
-        let uncompressed_deserialized: Point = serde_json::from_str(&uncompressed_hex)
+        let uncompressed_deserialized: Point = serde_json::from_str(uncompressed_hex)
             .expect("failed to deserialize uncompressed point");
 
         assert_eq!(
