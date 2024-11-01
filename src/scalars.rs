@@ -156,7 +156,10 @@ impl Scalar {
     /// big-endian format.
     pub fn from_slice(bytes: &[u8]) -> Result<Self, InvalidScalarBytes> {
         #[cfg(feature = "secp256k1")]
-        let inner = secp256k1::SecretKey::from_slice(bytes).map_err(|_| InvalidScalarBytes)?;
+        let inner = {
+            let byte_array = <&[u8; 32]>::try_from(bytes).map_err(|_| InvalidScalarBytes)?;
+            secp256k1::SecretKey::from_byte_array(byte_array).map_err(|_| InvalidScalarBytes)?
+        };
 
         #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
         let inner = k256::NonZeroScalar::try_from(bytes).map_err(|_| InvalidScalarBytes)?;
@@ -744,7 +747,7 @@ mod conversions {
                 arr[16..].clone_from_slice(&value.to_be_bytes());
 
                 #[cfg(feature = "secp256k1")]
-                let inner = secp256k1::SecretKey::from_slice(&arr).unwrap();
+                let inner = secp256k1::SecretKey::from_byte_array(&arr).unwrap();
 
                 #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
                 let inner = k256::NonZeroScalar::from_repr(arr.into()).unwrap();

@@ -201,7 +201,7 @@ impl Point {
     /// is even.
     pub fn lift_x(x_bytes: &[u8; 32]) -> Result<Point, InvalidPointBytes> {
         #[cfg(feature = "secp256k1")]
-        return secp256k1::XOnlyPublicKey::from_slice(x_bytes)
+        return secp256k1::XOnlyPublicKey::from_byte_array(x_bytes)
             .map(|xonly| Point::from((xonly, secp256k1::Parity::Even)))
             .map_err(|_| InvalidPointBytes);
 

@@ -16,7 +16,7 @@ k256 = { version = "0.13", optional = true, default-features = false, features =
 num-traits = { version = "0.2", default-features = false, optional = true }
 once_cell = { version = "1.18", default-features = false, features = ["std"] }
 rand = { version = "0.8", optional = true, default-features = false }
-secp256k1 = { version = "0.29", optional = true, default-features = false, features = ["std"] }
+secp256k1 = { version = "0.30", optional = true, default-features = false, features = ["std"] }
 serde = { version = "1.0", default-features = false, optional = true }
 serdect = { version = "0.2", default-features = false, optional = true, features = ["alloc"] }
 subtle = { version = "2", default-features = false, features = ["std", "const-generics"] }
@@ -35,7 +35,7 @@ cli-rng = ["rand", "rand/std"]
 secp256k1 = ["dep:secp256k1"]
 k256 = ["dep:k256"]
 serde = ["dep:serde", "secp256k1?/serde", "dep:serdect"]
-rand = ["dep:rand", "secp256k1?/rand-std"]
+rand = ["dep:rand", "secp256k1?/rand"]
 secp256k1-invert = ["dep:crypto-bigint"]
 num-traits = ["dep:num-traits"]
 
