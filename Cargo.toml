@@ -18,7 +18,7 @@ once_cell = { version = "1.18", default-features = false, features = ["std"] }
 rand = { version = "0.8", optional = true, default-features = false }
 secp256k1 = { version = "0.30", optional = true, default-features = false, features = ["std"] }
 serde = { version = "1.0", default-features = false, optional = true }
-serdect = { version = "0.2", default-features = false, optional = true, features = ["alloc"] }
+serdect = { version = "0.3", default-features = false, optional = true, features = ["alloc"] }
 subtle = { version = "2", default-features = false, features = ["std", "const-generics"] }
 
 [dev-dependencies]
