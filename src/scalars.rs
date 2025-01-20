@@ -669,7 +669,7 @@ mod conversions {
             /// Use cautiously. Non-constant time operations on these bytes
             /// could reveal secret key material.
             fn as_ref(&self) -> &[u8; 32] {
-                return self.inner.as_ref();
+                self.inner.as_ref()
             }
         }
 
