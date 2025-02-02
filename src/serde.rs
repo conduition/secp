@@ -83,7 +83,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn scalar_serialize() {
+    fn scalar_serialize_json() {
         let scalar = "b21643ba6bd9b6ca2e1f6da85561092ad44949835519d71dd837be8a8c67fe7f"
             .parse::<Scalar>()
             .unwrap();
@@ -128,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn point_serialize() {
+    fn point_serialize_json() {
         let point = "02d4d12f80d7e01f09322198408b4302716b5b8e9c7587e5c022cf65054d7cf722"
             .parse::<Point>()
             .unwrap();
@@ -180,6 +180,108 @@ mod tests {
         );
         let uncompressed_deserialized: Point = serde_json::from_str(uncompressed_hex)
             .expect("failed to deserialize uncompressed point");
+
+        assert_eq!(
+            uncompressed_deserialized,
+            "03fdbf1eee1ffc22505dd284e866a3b16006e218f130c20c0bbf455d4b2c063acf"
+                .parse::<Point>()
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn scalar_serialize_cbor() {
+        let scalar = "b21643ba6bd9b6ca2e1f6da85561092ad44949835519d71dd837be8a8c67fe7f"
+            .parse::<Scalar>()
+            .unwrap();
+
+        // Serialize a `Scalar`
+        let serialized = serde_cbor::to_vec(&scalar).unwrap();
+        assert_eq!(
+            &hex::encode(&serialized),
+            "5820b21643ba6bd9b6ca2e1f6da85561092ad44949835519d71dd837be8a8c67fe7f"
+        );
+
+        // Deserialize a `Scalar`
+        let deserialized: Scalar =
+            serde_cbor::from_slice(&serialized).expect("error deserializing Scalar");
+        assert_eq!(deserialized, scalar);
+
+        // Deserialize a `MaybeScalar`
+        let maybe_deserialized: MaybeScalar =
+            serde_cbor::from_slice(&serialized).expect("error deserializing MaybeScalar");
+        assert_eq!(maybe_deserialized, MaybeScalar::Valid(scalar));
+
+        // Serialize a `MaybeScalar`
+        assert_eq!(
+            &serde_cbor::to_vec(&MaybeScalar::Valid(scalar))
+                .expect("failed to serialize MaybeScalar"),
+            &serialized
+        );
+
+        // Deserialize zero
+        let zero_deserialized: MaybeScalar = serde_cbor::from_slice(
+            &hex::decode("58200000000000000000000000000000000000000000000000000000000000000000")
+                .unwrap(),
+        )
+        .expect("error deserializing zero");
+
+        assert_eq!(zero_deserialized, MaybeScalar::Zero);
+
+        // Serialize zero
+        assert_eq!(
+            &hex::encode(serde_cbor::to_vec(&MaybeScalar::Zero).expect("failed to serialize zero")),
+            "58200000000000000000000000000000000000000000000000000000000000000000"
+        );
+    }
+
+    #[test]
+    fn point_serialize_cbor() {
+        let point = "02d4d12f80d7e01f09322198408b4302716b5b8e9c7587e5c022cf65054d7cf722"
+            .parse::<Point>()
+            .unwrap();
+
+        // Serialize a `Point`
+        let serialized = serde_cbor::to_vec(&point).expect("failed to serialize Point");
+        assert_eq!(
+            &hex::encode(&serialized),
+            "582102d4d12f80d7e01f09322198408b4302716b5b8e9c7587e5c022cf65054d7cf722"
+        );
+
+        // Deserialize a `Point`
+        let deserialized: Point =
+            serde_cbor::from_slice(&serialized).expect("error deserializing Point");
+        assert_eq!(deserialized, point);
+
+        // Deserialize a `MaybePoint`
+        let maybe_deserialized: MaybePoint =
+            serde_cbor::from_slice(&serialized).expect("error deserializing Point");
+        assert_eq!(maybe_deserialized, MaybePoint::Valid(point));
+
+        // Serialize a `MaybePoint`
+        assert_eq!(
+            &serde_cbor::to_vec(&maybe_deserialized).expect("failed to serialize MaybePoint"),
+            &serialized,
+        );
+
+        // Serialize infinity
+        let inf_serialized =
+            serde_cbor::to_vec(&MaybePoint::Infinity).expect("failed to serialize zero");
+        assert_eq!(
+            &hex::encode(inf_serialized),
+            "5821000000000000000000000000000000000000000000000000000000000000000000"
+        );
+
+        // Can deserialize uncompressed points as well.
+        let uncompressed_hex = concat!(
+            "5841",
+            "04",
+            "fdbf1eee1ffc22505dd284e866a3b16006e218f130c20c0bbf455d4b2c063acf",
+            "aa031ac5f64874895ffa5c17b4b9f06cfa63407e34a2c8017a630651f8e8bd9d",
+        );
+        let uncompressed_deserialized: Point =
+            serde_cbor::from_slice(&hex::decode(uncompressed_hex).unwrap())
+                .expect("failed to deserialize uncompressed point");
 
         assert_eq!(
             uncompressed_deserialized,
