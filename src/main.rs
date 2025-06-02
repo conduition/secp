@@ -142,7 +142,7 @@ fn run_scalar_op(args: &[String]) -> Result<(), Error> {
     match args[0].as_str() {
         #[cfg(feature = "cli-rng")]
         "gen" => {
-            println!("{:x}", Scalar::random(&mut rand::thread_rng()));
+            println!("{:x}", Scalar::random(&mut rand::rng()));
         }
 
         "add" => {
@@ -194,7 +194,7 @@ fn run_point_op(args: &[String]) -> Result<(), Error> {
     match args[0].as_str() {
         #[cfg(feature = "cli-rng")]
         "gen" => {
-            println!("{:x}", Scalar::random(&mut rand::thread_rng()) * G);
+            println!("{:x}", Scalar::random(&mut rand::rng()) * G);
         }
 
         "add" => {

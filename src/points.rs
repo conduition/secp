@@ -199,7 +199,7 @@ impl Point {
     /// two corresponding Y-coordinates: one even, and one odd. This function computes
     /// the point for which the X-coordinate is represented by `x_bytes`, and the Y-coordinate
     /// is even.
-    pub fn lift_x(x_bytes: &[u8; 32]) -> Result<Point, InvalidPointBytes> {
+    pub fn lift_x(x_bytes: [u8; 32]) -> Result<Point, InvalidPointBytes> {
         #[cfg(feature = "secp256k1")]
         return secp256k1::XOnlyPublicKey::from_byte_array(x_bytes)
             .map(|xonly| Point::from((xonly, secp256k1::Parity::Even)))
@@ -207,7 +207,7 @@ impl Point {
 
         #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
         return {
-            let point_opt = k256::AffinePoint::decompact(x_bytes.into())
+            let point_opt = k256::AffinePoint::decompact((&x_bytes).into())
                 .and_then(k256::elliptic_curve::point::NonIdentity::new);
 
             Option::<k256::elliptic_curve::point::NonIdentity<_>>::from(point_opt)
@@ -234,7 +234,7 @@ impl Point {
         return {
             let mut x_bytes = [0; 32];
             base16ct::mixed::decode(x_bytes_hex, &mut x_bytes).map_err(|_| InvalidPointString)?;
-            Point::lift_x(&x_bytes).map_err(|_| InvalidPointString)
+            Point::lift_x(x_bytes).map_err(|_| InvalidPointString)
         };
     }
 
@@ -1361,7 +1361,7 @@ mod tests {
             0xBC, 0xE0, 0x36, 0xF9,
         ];
         assert_eq!(point.serialize_xonly(), xonly_bytes);
-        assert_eq!(Point::lift_x(&xonly_bytes).unwrap(), point);
+        assert_eq!(Point::lift_x(xonly_bytes).unwrap(), point);
 
         assert_eq!(
             "020000000000000000000000000000000000000000000000000000000000000000"

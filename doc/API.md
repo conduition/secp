@@ -24,7 +24,7 @@ Depending on which features of this crate are enabled, we implement various conv
 ```rust
 # #[cfg(all(feature = "secp256k1", feature = "rand"))]
 # {
-let seckey = secp256k1::SecretKey::new(&mut rand::rngs::OsRng);
+let seckey = secp256k1::SecretKey::new(&mut rand::rng());
 let scalar = secp::Scalar::from(seckey);
 secp256k1::SecretKey::from(scalar);
 secp256k1::Scalar::from(scalar);
@@ -35,7 +35,9 @@ secp256k1::PublicKey::from(point);
 
 # #[cfg(feature = "k256")]
 # {
-let seckey = k256::SecretKey::random(&mut rand::rngs::OsRng);
+let mut seckey_bytes = [0u8; 32];
+rand::RngCore::fill_bytes(&mut rand::rng(), &mut seckey_bytes);
+let seckey = k256::SecretKey::from_slice(&seckey_bytes).unwrap();
 let scalar = secp::Scalar::from(seckey);
 k256::SecretKey::from(scalar);
 k256::Scalar::from(scalar);

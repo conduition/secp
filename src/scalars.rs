@@ -131,8 +131,35 @@ impl Scalar {
         #[cfg(feature = "secp256k1")]
         let inner = secp256k1::SecretKey::new(rng);
 
+        // TODO: get rid of all this hacky legacy bridging crap once k256 updates to rand v0.9
         #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
-        let inner = k256::NonZeroScalar::random(rng);
+        let inner = k256::NonZeroScalar::random({
+            use k256::elliptic_curve::rand_core as legacy_rand_core;
+
+            struct RngBridge<'r, R>(&'r mut R);
+
+            impl<R: rand::RngCore + rand::CryptoRng> legacy_rand_core::CryptoRng for RngBridge<'_, R> {}
+            impl<R: rand::RngCore + rand::CryptoRng> legacy_rand_core::RngCore for RngBridge<'_, R> {
+                fn next_u32(&mut self) -> u32 {
+                    rand::RngCore::next_u32(self.0)
+                }
+                fn next_u64(&mut self) -> u64 {
+                    rand::RngCore::next_u64(self.0)
+                }
+                fn fill_bytes(&mut self, dest: &mut [u8]) {
+                    rand::RngCore::fill_bytes(self.0, dest)
+                }
+                fn try_fill_bytes(
+                    &mut self,
+                    dest: &mut [u8],
+                ) -> Result<(), legacy_rand_core::Error> {
+                    rand::RngCore::fill_bytes(self.0, dest);
+                    Ok(())
+                }
+            }
+
+            &mut RngBridge(rng)
+        });
 
         Scalar::from(inner)
     }
@@ -157,7 +184,7 @@ impl Scalar {
     pub fn from_slice(bytes: &[u8]) -> Result<Self, InvalidScalarBytes> {
         #[cfg(feature = "secp256k1")]
         let inner = {
-            let byte_array = <&[u8; 32]>::try_from(bytes).map_err(|_| InvalidScalarBytes)?;
+            let byte_array = <[u8; 32]>::try_from(bytes).map_err(|_| InvalidScalarBytes)?;
             secp256k1::SecretKey::from_byte_array(byte_array).map_err(|_| InvalidScalarBytes)?
         };
 
@@ -747,7 +774,7 @@ mod conversions {
                 arr[16..].clone_from_slice(&value.to_be_bytes());
 
                 #[cfg(feature = "secp256k1")]
-                let inner = secp256k1::SecretKey::from_byte_array(&arr).unwrap();
+                let inner = secp256k1::SecretKey::from_byte_array(arr).unwrap();
 
                 #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
                 let inner = k256::NonZeroScalar::from_repr(arr.into()).unwrap();
