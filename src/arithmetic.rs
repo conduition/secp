@@ -275,8 +275,8 @@ macro_rules! implement_binary_ops {
 /// - `$opname` is the trait name from `std::ops`, such as `AddAssign`, or `MulAssign`.
 /// - `$opfunc` is the function identifier for the trait.
 /// - `$lhs_type` and `$rhs_type` are types to implement the trait on.
-/// - `$operator` is the binary operator which is being implemented. This is used
-///    to invoke the actual binary operator.
+/// - `$operator` is the binary operator which is being implemented.
+///   This is used to invoke the actual binary operator.
 macro_rules! implement_assign_ops {
     (
         $opname:ident, $opfunc:ident, // AddAssign, add_assign,
