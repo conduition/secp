@@ -1,14 +1,14 @@
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use subtle::{ConditionallySelectable, ConstantTimeEq, ConstantTimeGreater};
 
 use super::errors::{InvalidScalarBytes, InvalidScalarString, ZeroScalarError};
 use super::{MaybePoint, Point};
 
 #[cfg(feature = "secp256k1")]
-pub(crate) static LIBSECP256K1_CTX: Lazy<secp256k1::Secp256k1<secp256k1::All>> =
-    Lazy::new(secp256k1::Secp256k1::new);
+pub(crate) static LIBSECP256K1_CTX: LazyLock<secp256k1::Secp256k1<secp256k1::All>> =
+    LazyLock::new(secp256k1::Secp256k1::new);
 
-static SCALAR_ONE: Lazy<Scalar> = Lazy::new(|| {
+static SCALAR_ONE: LazyLock<Scalar> = LazyLock::new(|| {
     Scalar::try_from(&[
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 1u8,
@@ -16,7 +16,7 @@ static SCALAR_ONE: Lazy<Scalar> = Lazy::new(|| {
     .unwrap()
 });
 
-static SCALAR_TWO: Lazy<Scalar> = Lazy::new(|| {
+static SCALAR_TWO: LazyLock<Scalar> = LazyLock::new(|| {
     Scalar::try_from(&[
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 2u8,
@@ -24,7 +24,7 @@ static SCALAR_TWO: Lazy<Scalar> = Lazy::new(|| {
     .unwrap()
 });
 
-static SCALAR_HALF_ORDER: Lazy<Scalar> = Lazy::new(|| {
+static SCALAR_HALF_ORDER: LazyLock<Scalar> = LazyLock::new(|| {
     Scalar::try_from(&[
         0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         0xff, 0x5d, 0x57, 0x6e, 0x73, 0x57, 0xa4, 0x50, 0x1d, 0xdf, 0xe9, 0x2f, 0x46, 0x68, 0x1b,
@@ -33,8 +33,8 @@ static SCALAR_HALF_ORDER: Lazy<Scalar> = Lazy::new(|| {
     .unwrap()
 });
 
-static SCALAR_MAX: Lazy<Scalar> =
-    Lazy::new(|| Scalar::try_from(&CURVE_ORDER_MINUS_ONE_BYTES).unwrap());
+static SCALAR_MAX: LazyLock<Scalar> =
+    LazyLock::new(|| Scalar::try_from(&CURVE_ORDER_MINUS_ONE_BYTES).unwrap());
 
 /// This is a big-endian representation of the secp256k1 curve order `n`.
 const CURVE_ORDER_BYTES: [u8; 32] = [

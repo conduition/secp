@@ -14,7 +14,6 @@ base16ct = { version = "0.2", default-features = false }
 crypto-bigint = { version = "0.5", default-features = false, optional = true }
 k256 = { version = "0.13", optional = true, default-features = false, features = ["std", "arithmetic"] }
 num-traits = { version = "0.2", default-features = false, optional = true }
-once_cell = { version = "1.21", default-features = false, features = ["std"] }
 rand = { version = "0.9", optional = true, default-features = false }
 secp256k1 = { version = "0.31", optional = true, default-features = false, features = ["std"] }
 serde = { version = "1.0", default-features = false, optional = true }

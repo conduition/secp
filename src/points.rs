@@ -1,4 +1,4 @@
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use subtle::ConditionallySelectable;
 
 use super::errors::{InfinityPointError, InvalidPointBytes, InvalidPointString};
@@ -26,8 +26,8 @@ const GENERATOR_POINT_BYTES: [u8; 65] = [
     0xfd, 0x17, 0xb4, 0x48, 0xa6, 0x85, 0x54, 0x19, 0x9c, 0x47, 0xd0, 0x8f, 0xfb, 0x10, 0xd4, 0xb8,
 ];
 
-static GENERATOR_POINT: Lazy<Point> =
-    Lazy::new(|| Point::try_from(&GENERATOR_POINT_BYTES).unwrap());
+static GENERATOR_POINT: LazyLock<Point> =
+    LazyLock::new(|| Point::try_from(&GENERATOR_POINT_BYTES).unwrap());
 
 /// This struct type represents the secp256k1 generator point, and can be
 /// used for scalar-point multiplication.
