@@ -28,6 +28,8 @@ let seckey = secp256k1::SecretKey::new(&mut rand::rng());
 let scalar = secp::Scalar::from(seckey);
 secp256k1::SecretKey::from(scalar);
 secp256k1::Scalar::from(scalar);
+secp::MaybeScalar::from(secp256k1::Scalar::from(scalar));
+secp::MaybeScalar::from(secp256k1::Scalar::ZERO);
 
 let point: secp::Point = scalar.base_point_mul();
 secp256k1::PublicKey::from(point);

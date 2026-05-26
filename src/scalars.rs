@@ -845,15 +845,18 @@ mod conversions {
         mod scalar {
             use super::*;
 
-            impl From<secp256k1::Scalar> for Scalar {
-                fn from(scalar: secp256k1::Scalar) -> Self {
-                    Scalar::try_from(scalar.to_be_bytes()).unwrap()
+            impl TryFrom<secp256k1::Scalar> for Scalar {
+                type Error = ZeroScalarError;
+                fn try_from(scalar: secp256k1::Scalar) -> Result<Self, Self::Error> {
+                    Scalar::try_from(scalar.to_be_bytes()).map_err(|_| ZeroScalarError)
                 }
             }
 
             impl From<secp256k1::Scalar> for MaybeScalar {
                 fn from(scalar: secp256k1::Scalar) -> Self {
-                    MaybeScalar::Valid(Scalar::from(scalar))
+                    Scalar::try_from(scalar)
+                        .map(MaybeScalar::Valid)
+                        .unwrap_or(MaybeScalar::Zero)
                 }
             }
 
@@ -863,10 +866,12 @@ mod conversions {
                 }
             }
 
-            impl TryFrom<MaybeScalar> for secp256k1::Scalar {
-                type Error = ZeroScalarError;
-                fn try_from(maybe_scalar: MaybeScalar) -> Result<Self, Self::Error> {
-                    Ok(secp256k1::Scalar::from(maybe_scalar.not_zero()?))
+            impl From<MaybeScalar> for secp256k1::Scalar {
+                fn from(maybe_scalar: MaybeScalar) -> Self {
+                    match maybe_scalar {
+                        MaybeScalar::Valid(Scalar { inner }) => secp256k1::Scalar::from(inner),
+                        MaybeScalar::Zero => secp256k1::Scalar::ZERO,
+                    }
                 }
             }
         }
